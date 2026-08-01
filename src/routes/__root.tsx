@@ -88,10 +88,26 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:title", content: "Luna — viagens inteligentes, memórias inesquecíveis" },
       { name: "twitter:title", content: "Luna — viagens inteligentes, memórias inesquecíveis" },
-      { property: "og:description", content: "A Luna é sua concierge digital de viagens: conta seus desejos, recebe um roteiro personalizado com voos, hospedagem, passeios e restaurantes." },
-      { name: "twitter:description", content: "A Luna é sua concierge digital de viagens: conta seus desejos, recebe um roteiro personalizado com voos, hospedagem, passeios e restaurantes." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/7229ea5f-e2b8-457e-b12a-eaaecb91c6dd/id-preview-923d3fe3--a1a07b3c-4baa-43d5-87c5-dac13bddbe58.lovable.app-1785621497486.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/7229ea5f-e2b8-457e-b12a-eaaecb91c6dd/id-preview-923d3fe3--a1a07b3c-4baa-43d5-87c5-dac13bddbe58.lovable.app-1785621497486.png" },
+      {
+        property: "og:description",
+        content:
+          "A Luna é sua concierge digital de viagens: conta seus desejos, recebe um roteiro personalizado com voos, hospedagem, passeios e restaurantes.",
+      },
+      {
+        name: "twitter:description",
+        content:
+          "A Luna é sua concierge digital de viagens: conta seus desejos, recebe um roteiro personalizado com voos, hospedagem, passeios e restaurantes.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/7229ea5f-e2b8-457e-b12a-eaaecb91c6dd/id-preview-923d3fe3--a1a07b3c-4baa-43d5-87c5-dac13bddbe58.lovable.app-1785621497486.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/7229ea5f-e2b8-457e-b12a-eaaecb91c6dd/id-preview-923d3fe3--a1a07b3c-4baa-43d5-87c5-dac13bddbe58.lovable.app-1785621497486.png",
+      },
     ],
     links: [
       {

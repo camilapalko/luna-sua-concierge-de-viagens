@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Sparkles, MessagesSquare, Compass, CheckCircle2, ArrowRight } from "lucide-react";
+import { Sparkles, MessagesSquare, Compass, CheckCircle2, ArrowRight, Star } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { LunaHeroCarousel } from "@/components/LunaHeroCarousel";
 import { Button } from "@/components/ui/button";
@@ -83,11 +83,13 @@ function Home() {
       <main>
         <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 md:grid-cols-2 md:py-24">
           <div>
-            <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-primary">
-              <Sparkles className="size-3.5" /> concierge digital
+            <span className="inline-flex items-center gap-2 rounded-full bg-secondary/70 px-3 py-1 text-xs font-semibold text-primary">
+              <Sparkles className="size-3.5" /> Sua concierge de viagens
             </span>
-            <h1 className="mt-5 font-display text-5xl font-semibold leading-tight md:text-6xl">
-              Viagens inteligentes, memórias inesquecíveis
+            <h1 className="mt-5 font-display text-5xl leading-tight md:text-6xl">
+              Viagens inteligentes,
+              <br />
+              <span className="font-semibold">memórias inesquecíveis.</span>
             </h1>
             <p className="mt-5 max-w-lg text-base text-muted-foreground">
               A Luna é a amiga experiente que ama planejar viagens. Ela entende o seu estilo,
@@ -103,6 +105,31 @@ function Home() {
               <Button asChild size="lg" variant="outline" className="rounded-2xl">
                 <Link to="/minhas-viagens">Minhas viagens</Link>
               </Button>
+            </div>
+
+            <div className="mt-6 inline-flex items-center gap-2 rounded-2xl border border-border/60 bg-card/60 px-4 py-2.5 text-xs font-medium text-muted-foreground">
+              <Sparkles className="size-3.5 text-primary" /> Tudo feito sob medida para você
+            </div>
+
+            <div className="mt-5 flex items-center gap-4">
+              <div className="flex -space-x-3">
+                {["#4A819A", "#E6E6FA", "#F4E3B2", "#94a3b8"].map((color) => (
+                  <span
+                    key={color}
+                    className="size-8 rounded-full border-2 border-background"
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                <p className="font-semibold text-foreground">Feito para viajantes exigentes</p>
+                <div className="mt-0.5 flex items-center gap-1 text-amber-500">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star key={i} className="size-3.5 fill-current" />
+                  ))}
+                  <span className="ml-1 text-muted-foreground">planejamento sob medida</span>
+                </div>
+              </div>
             </div>
           </div>
           <LunaHeroCarousel />
