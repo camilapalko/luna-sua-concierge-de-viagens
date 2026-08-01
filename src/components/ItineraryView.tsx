@@ -1,0 +1,223 @@
+import { useState } from "react";
+import {
+  Plane,
+  UtensilsCrossed,
+  Camera,
+  Car,
+  BedDouble,
+  Sparkles,
+  FileText,
+  ExternalLink,
+  Lightbulb,
+} from "lucide-react";
+import { Markdown } from "@/components/Markdown";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import { extractLinks, type Itinerary, type ItineraryActivity } from "@/lib/itinerary";
+
+const ICONS: Record<ItineraryActivity["kind"], typeof Plane> = {
+  voo: Plane,
+  refeicao: UtensilsCrossed,
+  passeio: Camera,
+  transporte: Car,
+  hospedagem: BedDouble,
+  outro: Sparkles,
+};
+
+function ChecklistBlock({ items }: { items: string[] }) {
+  const [checked, setChecked] = useState<Record<number, boolean>>({});
+  if (items.length === 0) return <p className="text-sm text-muted-foreground">Sem itens.</p>;
+  return (
+    <ul className="space-y-2">
+      {items.map((item, index) => (
+        <li key={item + index} className="flex items-start gap-3">
+          <Checkbox
+            id={`check-${index}`}
+            checked={Boolean(checked[index])}
+            onCheckedChange={(value) =>
+              setChecked((prev) => ({ ...prev, [index]: value === true }))
+            }
+            className="mt-0.5"
+          />
+          <label
+            htmlFor={`check-${index}`}
+            className={
+              checked[index]
+                ? "text-sm text-muted-foreground line-through"
+                : "text-sm text-foreground"
+            }
+          >
+            {item}
+          </label>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function LinkCards({ body, empty }: { body: string; empty: string }) {
+  const links = extractLinks(body);
+  if (links.length === 0) {
+    return body ? (
+      <Markdown content={body} />
+    ) : (
+      <p className="text-sm text-muted-foreground">{empty}</p>
+    );
+  }
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {links.map((link) => (
+        <div key={link.url} className="card-luna flex items-center justify-between gap-3 p-4">
+          <span className="text-sm font-medium">{link.label}</span>
+          <Button asChild size="sm" variant="secondary">
+            <a href={link.url} target="_blank" rel="noreferrer">
+              Ver opções <ExternalLink className="ml-1 size-3.5" />
+            </a>
+          </Button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function ItineraryView({ itinerary }: { itinerary: Itinerary }) {
+  const linkSection = itinerary.links;
+  const filterLinks = (keyword: RegExp) =>
+    linkSection
+      .split("\n")
+      .filter((line) => keyword.test(line) || /^#{2,4}\s/.test(line))
+      .join("\n");
+
+  return (
+    <div className="space-y-6">
+      <header className="rounded-2xl bg-gradient-to-br from-primary/10 via-secondary/40 to-accent/30 p-6">
+        <p className="text-xs font-semibold uppercase tracking-widest text-primary">Luna</p>
+        <h2 className="mt-1 font-display text-3xl font-semibold">Seu roteiro completo</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Tudo organizado: documentos, dia a dia, restaurantes, reservas e checklist.
+        </p>
+      </header>
+
+      <Accordion type="multiple" defaultValue={["docs"]} className="card-luna px-5">
+        <AccordionItem value="docs" className="border-none">
+          <AccordionTrigger className="font-display text-lg">
+            <span className="flex items-center gap-2">
+              <FileText className="size-4 text-primary" /> Documentação e requisitos
+            </span>
+          </AccordionTrigger>
+          <AccordionContent>
+            {itinerary.documentacao ? (
+              <Markdown content={itinerary.documentacao} />
+            ) : (
+              <p className="text-sm text-muted-foreground">Sem informações de documentação.</p>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
+      {itinerary.dias.length > 0 && (
+        <section className="card-luna p-6">
+          <h3 className="font-display text-xl font-semibold">Roteiro dia a dia</h3>
+          <ol className="mt-5 space-y-6 border-l border-border pl-6">
+            {itinerary.dias.map((day) => (
+              <li key={day.title} className="relative">
+                <span className="absolute -left-[31px] top-1 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <Sparkles className="size-3" />
+                </span>
+                <h4 className="font-display text-lg font-semibold">{day.title}</h4>
+                <ul className="mt-3 space-y-2">
+                  {day.activities.map((activity, index) => {
+                    const Icon = ICONS[activity.kind];
+                    return (
+                      <li
+                        key={activity.text + index}
+                        className="flex items-start gap-3 rounded-xl bg-muted/60 p-3"
+                      >
+                        <Icon className="mt-0.5 size-4 shrink-0 text-primary" />
+                        <span className="text-sm">{activity.text}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      {itinerary.restaurantes && (
+        <section className="card-luna p-6">
+          <h3 className="flex items-center gap-2 font-display text-xl font-semibold">
+            <UtensilsCrossed className="size-4 text-primary" /> Restaurantes
+          </h3>
+          <div className="mt-4">
+            <Markdown content={itinerary.restaurantes} />
+          </div>
+        </section>
+      )}
+
+      <section className="card-luna p-6">
+        <Tabs defaultValue="transporte">
+          <TabsList className="flex h-auto flex-wrap justify-start gap-1 bg-muted/60">
+            <TabsTrigger value="transporte">Transporte</TabsTrigger>
+            <TabsTrigger value="hospedagem">Hospedagem</TabsTrigger>
+            <TabsTrigger value="passeios">Passeios</TabsTrigger>
+            <TabsTrigger value="documentos">Documentos</TabsTrigger>
+            <TabsTrigger value="checklist">Checklist</TabsTrigger>
+            <TabsTrigger value="essencial">Essencial</TabsTrigger>
+          </TabsList>
+          <TabsContent value="transporte" className="pt-5">
+            <LinkCards
+              body={filterLinks(/voo|transporte|flight/i)}
+              empty="Sem links de transporte."
+            />
+          </TabsContent>
+          <TabsContent value="hospedagem" className="pt-5">
+            <LinkCards
+              body={filterLinks(/hosped|hotel|booking/i)}
+              empty="Sem links de hospedagem."
+            />
+          </TabsContent>
+          <TabsContent value="passeios" className="pt-5">
+            <LinkCards body={filterLinks(/passeio|tour|ticket/i)} empty="Sem links de passeios." />
+          </TabsContent>
+          <TabsContent value="documentos" className="pt-5">
+            {itinerary.documentacao ? (
+              <Markdown content={itinerary.documentacao} />
+            ) : (
+              <p className="text-sm text-muted-foreground">Sem documentos listados.</p>
+            )}
+          </TabsContent>
+          <TabsContent value="checklist" className="pt-5">
+            <ChecklistBlock items={itinerary.checklist} />
+          </TabsContent>
+          <TabsContent value="essencial" className="pt-5">
+            {itinerary.essencial ? (
+              <Markdown content={itinerary.essencial} />
+            ) : (
+              <p className="text-sm text-muted-foreground">Sem informações essenciais.</p>
+            )}
+          </TabsContent>
+        </Tabs>
+      </section>
+
+      {itinerary.dicas && (
+        <section className="rounded-2xl border border-accent/60 bg-accent/25 p-6">
+          <h3 className="flex items-center gap-2 font-display text-xl font-semibold">
+            <Lightbulb className="size-4 text-accent-foreground" /> Dicas finais da Luna
+          </h3>
+          <div className="mt-3">
+            <Markdown content={itinerary.dicas} />
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
