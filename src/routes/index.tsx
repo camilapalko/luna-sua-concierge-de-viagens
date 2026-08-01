@@ -1,11 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  Sparkles,
-  MessagesSquare,
-  Compass,
-  CheckCircle2,
-  ArrowRight,
-} from "lucide-react";
+import { Sparkles, MessagesSquare, Compass, CheckCircle2, ArrowRight } from "lucide-react";
 import heroImage from "@/assets/hero-luna.jpg";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";

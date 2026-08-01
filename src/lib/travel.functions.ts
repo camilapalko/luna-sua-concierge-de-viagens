@@ -36,8 +36,10 @@ async function askJson(prompt: string, schemaHint: string): Promise<unknown> {
     }),
   });
 
-  if (res.status === 429) throw new Error("Muitas buscas em pouco tempo. Tente novamente em instantes.");
-  if (res.status === 402) throw new Error("Os créditos de IA acabaram. Adicione créditos para continuar.");
+  if (res.status === 429)
+    throw new Error("Muitas buscas em pouco tempo. Tente novamente em instantes.");
+  if (res.status === 402)
+    throw new Error("Os créditos de IA acabaram. Adicione créditos para continuar.");
   if (!res.ok) throw new Error(`Falha na busca (${res.status}).`);
 
   const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };

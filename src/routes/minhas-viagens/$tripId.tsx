@@ -36,9 +36,7 @@ function TripPage() {
   const { session, loading } = useSession();
   const navigate = useNavigate();
   const fetchTrip = useServerFn(getTrip);
-  const [liveMessages, setLiveMessages] = useState<
-    Array<Pick<MessageRow, "role" | "content">>
-  >([]);
+  const [liveMessages, setLiveMessages] = useState<Array<Pick<MessageRow, "role" | "content">>>([]);
 
   useEffect(() => {
     if (!loading && !session) {

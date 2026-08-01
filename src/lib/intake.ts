@@ -168,15 +168,7 @@ export const INTAKE_QUESTIONS: IntakeQuestion[] = [
     label: "Restrições alimentares",
     prompt: "Alguma restrição alimentar que eu deva considerar?",
     type: "multi",
-    options: [
-      "Vegetariano",
-      "Vegano",
-      "Sem Glúten",
-      "Sem Lactose",
-      "Halal",
-      "Kosher",
-      "Nenhuma",
-    ],
+    options: ["Vegetariano", "Vegano", "Sem Glúten", "Sem Lactose", "Halal", "Kosher", "Nenhuma"],
   },
   {
     id: "special_requests",

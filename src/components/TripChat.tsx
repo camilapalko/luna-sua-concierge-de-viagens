@@ -112,7 +112,11 @@ export function TripChat({
             origin: String(profile["origin"] ?? trip.origin ?? "São Paulo"),
             destination: trip.destination,
             dates: String(profile["dates"] ?? ""),
-            preferences: [profile["flight_time_pref"], profile["airline_pref"], profile["connections_pref"]]
+            preferences: [
+              profile["flight_time_pref"],
+              profile["airline_pref"],
+              profile["connections_pref"],
+            ]
               .filter(Boolean)
               .join(", "),
           },
@@ -185,7 +189,11 @@ export function TripChat({
             disabled={toolBusy}
             onClick={() => void runTool("flights")}
           >
-            {toolBusy ? <Loader2 className="mr-1 size-3.5 animate-spin" /> : <Plane className="mr-1 size-3.5" />}
+            {toolBusy ? (
+              <Loader2 className="mr-1 size-3.5 animate-spin" />
+            ) : (
+              <Plane className="mr-1 size-3.5" />
+            )}
             Buscar voos
           </Button>
           <Button
@@ -194,7 +202,11 @@ export function TripChat({
             disabled={toolBusy}
             onClick={() => void runTool("stays")}
           >
-            {toolBusy ? <Loader2 className="mr-1 size-3.5 animate-spin" /> : <BedDouble className="mr-1 size-3.5" />}
+            {toolBusy ? (
+              <Loader2 className="mr-1 size-3.5 animate-spin" />
+            ) : (
+              <BedDouble className="mr-1 size-3.5" />
+            )}
             Buscar hospedagem
           </Button>
         </div>

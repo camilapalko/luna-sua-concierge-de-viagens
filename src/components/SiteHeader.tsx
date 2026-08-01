@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { LunaWordmark } from "@/components/LunaLogo";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/hooks/useSession";
@@ -9,6 +9,7 @@ export function SiteHeader() {
   const { user } = useSession();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   async function signOut() {
     await queryClient.cancelQueries();
@@ -33,7 +34,9 @@ export function SiteHeader() {
             </Button>
           ) : (
             <Button asChild size="sm">
-              <Link to="/auth">Entrar</Link>
+              <Link to="/auth" search={{ redirect: pathname }}>
+                Entrar
+              </Link>
             </Button>
           )}
         </nav>

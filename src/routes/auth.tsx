@@ -16,7 +16,8 @@ export const Route = createFileRoute("/auth")({
       { title: "Entrar na Luna" },
       {
         name: "description",
-        content: "Acesse sua conta Luna para salvar viagens e continuar a conversa com a concierge.",
+        content:
+          "Acesse sua conta Luna para salvar viagens e continuar a conversa com a concierge.",
       },
       { property: "og:title", content: "Entrar na Luna" },
       { property: "og:description", content: "Acesse sua conta e continue planejando sua viagem." },

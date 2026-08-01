@@ -72,9 +72,7 @@ export const Route = createFileRoute("/api/chat")({
           { role: "system", content: LUNA_SYSTEM_PROMPT },
           {
             role: "system",
-            content: buildContextPrompt(
-              (trip.profile ?? {}) as unknown as Record<string, unknown>,
-            ),
+            content: buildContextPrompt((trip.profile ?? {}) as unknown as Record<string, unknown>),
           },
           ...(history ?? []).map((m) => ({ role: m.role, content: m.content })),
         ];
@@ -92,7 +90,10 @@ export const Route = createFileRoute("/api/chat")({
         if (aiRes.status === 429)
           return json({ error: "Muitas mensagens em pouco tempo. Aguarde um instante." }, 429);
         if (aiRes.status === 402)
-          return json({ error: "Os créditos de IA acabaram. Adicione créditos para continuar." }, 402);
+          return json(
+            { error: "Os créditos de IA acabaram. Adicione créditos para continuar." },
+            402,
+          );
         if (!aiRes.ok || !aiRes.body)
           return json({ error: "A Luna não conseguiu responder agora." }, 500);
 
