@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Sparkles, MessagesSquare, Compass, CheckCircle2, ArrowRight } from "lucide-react";
-import heroImage from "@/assets/hero-luna.jpg";
 import { SiteHeader } from "@/components/SiteHeader";
+import { LunaHeroCarousel } from "@/components/LunaHeroCarousel";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
@@ -105,15 +105,7 @@ function Home() {
               </Button>
             </div>
           </div>
-          <div className="overflow-hidden rounded-3xl shadow-[var(--shadow-soft)]">
-            <img
-              src={heroImage}
-              alt="Vista aérea de um destino litorâneo ao pôr do sol"
-              width={1600}
-              height={1100}
-              className="h-full w-full object-cover"
-            />
-          </div>
+          <LunaHeroCarousel />
         </section>
 
         <section className="mx-auto max-w-6xl px-4 py-16">
