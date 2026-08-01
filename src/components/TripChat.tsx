@@ -27,7 +27,6 @@ export function TripChat({
   const [draft, setDraft] = useState("");
   const [streaming, setStreaming] = useState("");
   const [busy, setBusy] = useState(false);
-  const [tools, setTools] = useState<string | null>(null);
   const [toolBusy, setToolBusy] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -103,7 +102,6 @@ export function TripChat({
 
   async function runTool(kind: "flights" | "stays") {
     setToolBusy(true);
-    setTools(null);
     try {
       const profile = trip.profile as Record<string, string | string[]>;
       if (kind === "flights") {
@@ -130,7 +128,7 @@ export function TripChat({
           "",
           `[Google Flights](${result.links.googleFlights}) · [Kayak](${result.links.kayak}) · [Skyscanner](${result.links.skyscanner})`,
         ].join("\n");
-        setTools(body);
+        await appendToolMessage(body);
       } else {
         const result = await searchStays({
           data: {
@@ -149,13 +147,23 @@ export function TripChat({
           "",
           `[Buscar no Booking.com](${result.links.booking})`,
         ].join("\n");
-        setTools(body);
+        await appendToolMessage(body);
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não consegui buscar agora.");
     } finally {
       setToolBusy(false);
     }
+  }
+
+  async function appendToolMessage(content: string) {
+    const { error } = await supabase
+      .from("messages")
+      .insert({ trip_id: trip.id, role: "assistant", content });
+    if (error) {
+      toast.error("A busca funcionou, mas não consegui salvar na conversa.");
+    }
+    setMessages((prev) => [...prev, { role: "assistant", content }]);
   }
 
   return (
@@ -171,11 +179,6 @@ export function TripChat({
             <span className="flex gap-1">
               <Dot /> <Dot delay="150ms" /> <Dot delay="300ms" />
             </span>
-          </div>
-        )}
-        {tools && (
-          <div className="card-luna p-4">
-            <Markdown content={tools} />
           </div>
         )}
         <div ref={bottomRef} />
