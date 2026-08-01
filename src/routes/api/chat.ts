@@ -65,7 +65,8 @@ export const Route = createFileRoute("/api/chat")({
           .from("messages")
           .select("role, content")
           .eq("trip_id", trip.id)
-          .order("created_at", { ascending: true });
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true });
         if (historyError) return json({ error: historyError.message }, 500);
 
         const messages = [
