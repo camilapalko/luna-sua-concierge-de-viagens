@@ -78,14 +78,20 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Luna — concierge digital de viagens" },
+      { title: "Luna — viagens inteligentes, memórias inesquecíveis" },
       {
         name: "description",
         content:
-          "A Luna planeja sua viagem do jeito que você sonha: roteiro personalizado, voos, hospedagem e dicas em uma conversa.",
+          "A Luna é sua concierge digital de viagens: conta seus desejos, recebe um roteiro personalizado com voos, hospedagem, passeios e restaurantes.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:title", content: "Luna — viagens inteligentes, memórias inesquecíveis" },
+      { name: "twitter:title", content: "Luna — viagens inteligentes, memórias inesquecíveis" },
+      { property: "og:description", content: "A Luna é sua concierge digital de viagens: conta seus desejos, recebe um roteiro personalizado com voos, hospedagem, passeios e restaurantes." },
+      { name: "twitter:description", content: "A Luna é sua concierge digital de viagens: conta seus desejos, recebe um roteiro personalizado com voos, hospedagem, passeios e restaurantes." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/7229ea5f-e2b8-457e-b12a-eaaecb91c6dd/id-preview-923d3fe3--a1a07b3c-4baa-43d5-87c5-dac13bddbe58.lovable.app-1785621497486.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/7229ea5f-e2b8-457e-b12a-eaaecb91c6dd/id-preview-923d3fe3--a1a07b3c-4baa-43d5-87c5-dac13bddbe58.lovable.app-1785621497486.png" },
     ],
     links: [
       {
@@ -98,7 +104,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap",
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
   }),
   shellComponent: RootShell,

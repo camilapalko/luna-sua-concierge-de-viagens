@@ -19,11 +19,11 @@ export const Route = createFileRoute("/")({
         content:
           "A Luna é sua concierge digital de viagens: conta seus desejos, recebe um roteiro personalizado com voos, hospedagem, passeios e restaurantes.",
       },
-      { property: "og:title", content: "Luna — concierge digital de viagens" },
+      { property: "og:title", content: "Luna — viagens inteligentes, memórias inesquecíveis" },
       {
         property: "og:description",
         content:
-          "Planeje sua próxima viagem conversando com a Luna: roteiro personalizado, voos, hospedagem e dicas.",
+          "A Luna é sua concierge digital de viagens: conta seus desejos, recebe um roteiro personalizado com voos, hospedagem, passeios e restaurantes.",
       },
     ],
   }),
