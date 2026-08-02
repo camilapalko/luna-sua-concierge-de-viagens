@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Send, Sparkles, Plane, BedDouble, Loader2 } from "lucide-react";
+import { Send, Sparkles, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,11 +9,10 @@ import { ItineraryView } from "@/components/ItineraryView";
 import { LunaLogo } from "@/components/LunaLogo";
 import { isItineraryMessage, parseItinerary } from "@/lib/itinerary";
 import { supabase } from "@/integrations/supabase/client";
-import { searchFlights, searchStays } from "@/lib/travel.functions";
 import { updateTripStatus, type MessageRow, type TripRow } from "@/lib/trips.functions";
 import { cn } from "@/lib/utils";
 
-type ChatMessage = Pick<MessageRow, "role" | "content"> & { id?: string };
+type ChatMessage = Pick<MessageRow, "role" | "content"> & { id?: string; error?: boolean };
 
 export function TripChat({
   trip,
@@ -28,7 +27,6 @@ export function TripChat({
   const [draft, setDraft] = useState("");
   const [streaming, setStreaming] = useState("");
   const [busy, setBusy] = useState(false);
-  const [toolBusy, setToolBusy] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const started = useRef(false);
@@ -77,6 +75,11 @@ export function TripChat({
           full += decoder.decode(value, { stream: true });
           setStreaming(full);
         }
+
+        if (!full.trim()) {
+          throw new Error("A Luna não conseguiu responder agora. Tente enviar de novo.");
+        }
+
         setMessages((prev) => [...prev, { role: "assistant", content: full }]);
         setStreaming("");
         if (trip.status !== "finalizada" && isItineraryMessage(full)) {
@@ -85,7 +88,13 @@ export function TripChat({
           });
         }
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Erro ao falar com a Luna.");
+        const text = error instanceof Error ? error.message : "Erro ao falar com a Luna.";
+        toast.error(text);
+        setStreaming("");
+        // Além do toast (que pode passar despercebido), deixa um aviso visível
+        // dentro da própria conversa, pra ficar claro que algo falhou — em vez
+        // de a conversa simplesmente "não avançar" sem explicação nenhuma.
+        setMessages((prev) => [...prev, { role: "assistant", content: text, error: true }]);
       } finally {
         setBusy(false);
         inputRef.current?.focus();
@@ -107,77 +116,16 @@ export function TripChat({
     inputRef.current?.focus();
   }, []);
 
-  async function runTool(kind: "flights" | "stays") {
-    setToolBusy(true);
-    try {
-      const profile = trip.profile as Record<string, string | string[]>;
-      if (kind === "flights") {
-        const result = await searchFlights({
-          data: {
-            origin: String(profile["origin"] ?? trip.origin ?? "São Paulo"),
-            destination: trip.destination,
-            dates: String(profile["dates"] ?? ""),
-            preferences: [
-              profile["flight_time_pref"],
-              profile["airline_pref"],
-              profile["connections_pref"],
-            ]
-              .filter(Boolean)
-              .join(", "),
-          },
-        });
-        const body = [
-          "### ✈️ Opções de voo encontradas",
-          ...result.options.map(
-            (o) =>
-              `- **${o.airline}** · ${o.departure} → ${o.arrival} · ${o.duration} · ${o.stops} · ${o.price}`,
-          ),
-          "",
-          `[Google Flights](${result.links.googleFlights}) · [Kayak](${result.links.kayak}) · [Skyscanner](${result.links.skyscanner})`,
-        ].join("\n");
-        await appendToolMessage(body);
-      } else {
-        const result = await searchStays({
-          data: {
-            destination: trip.destination,
-            dates: String(profile["dates"] ?? ""),
-            style: String(profile["budget"] ?? ""),
-            travelers: String(profile["travelers"] ?? ""),
-          },
-        });
-        const body = [
-          "### 🏨 Opções de hospedagem",
-          ...result.options.map(
-            (o) =>
-              `- **${o.name}** (${o.type}) · ${o.location} · ${o.pricePerNight} · ${o.amenities.join(", ")}`,
-          ),
-          "",
-          `[Buscar no Booking.com](${result.links.booking})`,
-        ].join("\n");
-        await appendToolMessage(body);
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não consegui buscar agora.");
-    } finally {
-      setToolBusy(false);
-    }
-  }
-
-  async function appendToolMessage(content: string) {
-    const { error } = await supabase
-      .from("messages")
-      .insert({ trip_id: trip.id, role: "assistant", content });
-    if (error) {
-      toast.error("A busca funcionou, mas não consegui salvar na conversa.");
-    }
-    setMessages((prev) => [...prev, { role: "assistant", content }]);
-  }
-
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1 space-y-5 overflow-y-auto px-1 pb-6">
         {messages.map((message, index) => (
-          <Bubble key={message.id ?? index} role={message.role} content={message.content} />
+          <Bubble
+            key={message.id ?? index}
+            role={message.role}
+            content={message.content}
+            error={message.error}
+          />
         ))}
         {streaming && <Bubble role="assistant" content={streaming} />}
         {busy && !streaming && (
@@ -192,34 +140,6 @@ export function TripChat({
       </div>
 
       <div className="border-t border-border/70 bg-background/80 px-1 pt-4">
-        <div className="mb-3 flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={toolBusy}
-            onClick={() => void runTool("flights")}
-          >
-            {toolBusy ? (
-              <Loader2 className="mr-1 size-3.5 animate-spin" />
-            ) : (
-              <Plane className="mr-1 size-3.5" />
-            )}
-            Buscar voos
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={toolBusy}
-            onClick={() => void runTool("stays")}
-          >
-            {toolBusy ? (
-              <Loader2 className="mr-1 size-3.5 animate-spin" />
-            ) : (
-              <BedDouble className="mr-1 size-3.5" />
-            )}
-            Buscar hospedagem
-          </Button>
-        </div>
         <form
           className="flex items-end gap-2"
           onSubmit={(event) => {
@@ -265,10 +185,32 @@ function Dot({ delay = "0ms" }: { delay?: string }) {
   );
 }
 
-export function Bubble({ role, content }: { role: "user" | "assistant"; content: string }) {
+export function Bubble({
+  role,
+  content,
+  error,
+}: {
+  role: "user" | "assistant";
+  content: string;
+  error?: boolean | undefined;
+}) {
   if (role === "assistant" && isItineraryMessage(content)) {
     return <ItineraryView itinerary={parseItinerary(content)} />;
   }
+
+  if (error) {
+    return (
+      <div className="flex gap-3">
+        <span className="mt-1 inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+          <AlertCircle className="size-4" />
+        </span>
+        <div className="max-w-[85%] rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {content}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("flex gap-3", role === "user" ? "justify-end" : "justify-start")}>
       {role === "assistant" && <LunaLogo size={32} className="mt-1 shrink-0" />}
