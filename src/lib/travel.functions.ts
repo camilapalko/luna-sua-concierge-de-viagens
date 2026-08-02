@@ -33,6 +33,8 @@ async function askJson(prompt: string, schemaHint: string): Promise<unknown> {
         { role: "user", content: prompt },
       ],
       response_format: { type: "json_object" },
+      // Busca na web em tempo real (sem APIs pagas de voo/hospedagem)
+      plugins: [{ id: "web", max_results: 5 }],
     }),
   });
 
@@ -63,11 +65,17 @@ export type FlightOption = {
 export const searchFlights = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (input: { origin: string; destination: string; dates?: string; preferences?: string }) => input,
+    (input: {
+      origin: string;
+      destination: string;
+      dates?: string;
+      passengers?: string;
+      preferences?: string;
+    }) => input,
   )
   .handler(async ({ data }) => {
     const result = (await askJson(
-      `Busque 3 opções de voo de ${data.origin} para ${data.destination}. Datas: ${data.dates ?? "flexíveis"}. Preferências: ${data.preferences ?? "nenhuma"}.`,
+      `Busque 3 opções de voo de ${data.origin} para ${data.destination}. Datas: ${data.dates ?? "flexíveis"}. Passageiros: ${data.passengers ?? "1"}. Preferências: ${data.preferences ?? "nenhuma"}.`,
       `{"options":[{"airline":string,"departure":string,"arrival":string,"duration":string,"stops":string,"price":string}]}`,
     )) as { options?: FlightOption[] };
 
@@ -105,11 +113,17 @@ export type StayOption = {
 export const searchStays = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (input: { destination: string; dates?: string; style?: string; travelers?: string }) => input,
+    (input: {
+      destination: string;
+      dates?: string;
+      guests?: string;
+      style?: string;
+      travelers?: string;
+    }) => input,
   )
   .handler(async ({ data }) => {
     const result = (await askJson(
-      `Busque 4 opções de hospedagem em ${data.destination}. Datas: ${data.dates ?? "flexíveis"}. Estilo: ${data.style ?? "moderado"}. Viajantes: ${data.travelers ?? "não informado"}.`,
+      `Busque 4 opções de hospedagem em ${data.destination}. Datas: ${data.dates ?? "flexíveis"}. Estilo: ${data.style ?? "moderado"}. Hóspedes: ${data.guests ?? data.travelers ?? "não informado"}.`,
       `{"options":[{"name":string,"type":string,"location":string,"pricePerNight":string,"amenities":string[]}]}`,
     )) as { options?: StayOption[] };
 
