@@ -98,14 +98,14 @@ export function PlanningPreviewSection() {
         Veja o que você vai receber no seu planejamento
       </h2>
 
-      <div className="mt-10 grid gap-6 md:grid-cols-3">
-        <div>
+      <div className="mt-10 grid items-stretch gap-6 md:grid-cols-3">
+        <div className="flex h-full flex-col">
           <ColumnHeading
             icon={COLUMNS[0]!.icon}
             title={COLUMNS[0]!.title}
             text={COLUMNS[0]!.text}
           />
-          <div className="card-luna mt-4 space-y-3 p-4">
+          <div className="card-luna mt-4 flex-1 space-y-3 p-4">
             {FLIGHT_CARD.map((item) => (
               <div key={item.title} className="flex items-center gap-3 rounded-xl bg-muted/60 p-3">
                 <item.icon className="size-4 shrink-0 text-primary" />
@@ -119,13 +119,13 @@ export function PlanningPreviewSection() {
           </div>
         </div>
 
-        <div>
+        <div className="flex h-full flex-col">
           <ColumnHeading
             icon={COLUMNS[1]!.icon}
             title={COLUMNS[1]!.title}
             text={COLUMNS[1]!.text}
           />
-          <div className="card-luna mt-4 space-y-3 p-4">
+          <div className="card-luna mt-4 flex-1 space-y-3 p-4">
             {ITINERARY_CARD.map((item) => (
               <div key={item.title} className="flex items-start gap-3 rounded-xl bg-muted/60 p-3">
                 <item.icon className="mt-0.5 size-4 shrink-0 text-primary" />
@@ -141,13 +141,13 @@ export function PlanningPreviewSection() {
           </div>
         </div>
 
-        <div>
+        <div className="flex h-full flex-col">
           <ColumnHeading
             icon={COLUMNS[2]!.icon}
             title={COLUMNS[2]!.title}
             text={COLUMNS[2]!.text}
           />
-          <div className="card-luna mt-4 space-y-3 p-4">
+          <div className="card-luna mt-4 flex-1 space-y-3 p-4">
             {TIPS_CARD.map((item) => (
               <div key={item.title} className="flex items-start gap-3 rounded-xl bg-muted/60 p-3">
                 <item.icon className="mt-0.5 size-4 shrink-0 text-primary" />

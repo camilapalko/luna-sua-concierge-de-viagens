@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { useQueryClient } from "@tanstack/react-query";
 import { Send, Sparkles, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ export function TripChat({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const started = useRef(false);
   const markFinished = useServerFn(updateTripStatus);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -82,6 +84,11 @@ export function TripChat({
 
         setMessages((prev) => [...prev, { role: "assistant", content: full }]);
         setStreaming("");
+        // Recarrega a viagem do banco: sem isso, a aba "Viagem" pode continuar
+        // usando os dados carregados antes dessa resposta (por exemplo, se o
+        // usuário trocar de aba e voltar, o chat remonta com os dados antigos
+        // e "esconde" o roteiro recém-gerado até um refresh manual).
+        void queryClient.invalidateQueries({ queryKey: ["trip", trip.id] });
         if (trip.status !== "finalizada" && isItineraryMessage(full)) {
           markFinished({ data: { tripId: trip.id, status: "finalizada" } }).catch(() => {
             // silencioso: o roteiro já foi entregue, só o status ficaria desatualizado
@@ -100,7 +107,7 @@ export function TripChat({
         inputRef.current?.focus();
       }
     },
-    [trip.id, trip.status, markFinished],
+    [trip.id, trip.status, markFinished, queryClient],
   );
 
   useEffect(() => {

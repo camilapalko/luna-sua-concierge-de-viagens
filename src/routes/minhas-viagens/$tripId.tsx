@@ -54,10 +54,18 @@ function TripPage() {
     enabled: Boolean(session),
   });
 
-  const itinerary = useMemo(
-    () => findLatestItinerary(liveMessages.length ? liveMessages : (data?.messages ?? [])),
-    [liveMessages, data],
-  );
+  // Junta o que veio do banco (data.messages) com o que o chat tem localmente
+  // (liveMessages) em vez de escolher um OU outro: se o componente de chat
+  // remontar (ex.: trocar de aba e voltar) e "esquecer" mensagens novas que
+  // ainda não tinham sido recarregadas do banco, o roteiro final não some da
+  // aba "Viagem" por causa disso.
+  const itinerary = useMemo(() => {
+    const base = data?.messages ?? [];
+    const extra = liveMessages.filter(
+      (lm) => !base.some((m) => m.role === lm.role && m.content === lm.content),
+    );
+    return findLatestItinerary([...base, ...extra]);
+  }, [liveMessages, data]);
 
   if (loading || isLoading || !data) {
     return (

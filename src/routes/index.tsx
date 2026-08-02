@@ -136,8 +136,6 @@ function Home() {
           <LunaHeroCarousel />
         </section>
 
-        <PlanningPreviewSection />
-
         <section className="mx-auto max-w-6xl px-4 py-16">
           <h2 className="text-center font-display text-4xl font-semibold">Como funciona</h2>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
@@ -155,6 +153,8 @@ function Home() {
             ))}
           </div>
         </section>
+
+        <PlanningPreviewSection />
 
         <section className="mx-auto max-w-3xl px-4 py-16">
           <h2 className="text-center font-display text-4xl font-semibold">Perguntas frequentes</h2>
