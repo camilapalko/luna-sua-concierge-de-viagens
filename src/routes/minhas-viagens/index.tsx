@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CalendarDays, MapPin, Loader2, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, MapPin, Loader2, Plus, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { deleteTrip, listTrips, type TripRow } from "@/lib/trips.functions";
+import { formatAnswer } from "@/lib/intake";
 import { useSession } from "@/hooks/useSession";
 
 export const Route = createFileRoute("/minhas-viagens/")({
@@ -37,6 +38,22 @@ export const Route = createFileRoute("/minhas-viagens/")({
   }),
   component: TripsPage,
 });
+
+function tripDatesLabel(trip: TripRow): string | null {
+  const dates = trip.profile?.["dates"];
+  const duration = trip.profile?.["trip_duration"];
+  if (dates && dates !== "Datas ainda não definidas") return formatAnswer(dates);
+  if (duration) return `${formatAnswer(duration)} (datas a definir)`;
+  return null;
+}
+
+function tripTravelersLabel(trip: TripRow): string | null {
+  const travelers = trip.profile?.["travelers"];
+  const num = trip.profile?.["num_travelers"];
+  if (!travelers) return null;
+  if (num) return `${formatAnswer(travelers)} · ${formatAnswer(num)} pessoas`;
+  return formatAnswer(travelers);
+}
 
 function TripsPage() {
   const { session, loading } = useSession();
@@ -142,8 +159,19 @@ function TripsPage() {
                 <h2 className="mt-4 flex items-center gap-2 font-display text-2xl font-semibold">
                   <MapPin className="size-4 text-primary" /> {trip.destination}
                 </h2>
-                <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                  <CalendarDays className="size-3.5" />
+                {tripDatesLabel(trip) && (
+                  <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                    <CalendarDays className="size-3.5" />
+                    {tripDatesLabel(trip)}
+                  </p>
+                )}
+                {tripTravelersLabel(trip) && (
+                  <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                    <Users className="size-3.5" />
+                    {tripTravelersLabel(trip)}
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-muted-foreground">
                   Criada em {new Date(trip.created_at).toLocaleDateString("pt-BR")}
                 </p>
               </Link>

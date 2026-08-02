@@ -14,6 +14,34 @@ function json(body: unknown, status: number) {
   });
 }
 
+/**
+ * Extrai os pedaços de texto (delta.content) de um bloco de linhas no
+ * formato Server-Sent Events retornado pelo gateway de IA, acumulando
+ * qualquer linha incompleta no `buffer` para a próxima chamada.
+ */
+function extractDeltas(buffer: string, chunk: string): { deltas: string[]; buffer: string } {
+  const combined = buffer + chunk;
+  const lines = combined.split("\n");
+  const nextBuffer = lines.pop() ?? "";
+  const deltas: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) continue;
+    const payload = trimmed.slice(5).trim();
+    if (payload === "[DONE]") continue;
+    try {
+      const parsed = JSON.parse(payload) as {
+        choices?: Array<{ delta?: { content?: string } }>;
+      };
+      const delta = parsed.choices?.[0]?.delta?.content;
+      if (delta) deltas.push(delta);
+    } catch {
+      // ignora chunks parciais que ainda não formam um JSON válido
+    }
+  }
+  return { deltas, buffer: nextBuffer };
+}
+
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
@@ -98,48 +126,68 @@ export const Route = createFileRoute("/api/chat")({
         if (!aiRes.ok || !aiRes.body)
           return json({ error: "A Luna não conseguiu responder agora." }, 500);
 
-        const reader = aiRes.body.getReader();
-        const decoder = new TextDecoder();
+        // Importante: usamos tee() para separar o stream em duas cópias
+        // independentes. Uma vai pro cliente (pra exibir a resposta em tempo
+        // real); a outra é consumida aqui no servidor até o fim, INDEPENDENTE
+        // de o cliente continuar conectado, e é ela quem grava a mensagem da
+        // Luna no banco. Antes disso, se o usuário saísse da tela (trocasse
+        // de aba, fechasse o app, navegasse pra "Minhas viagens") enquanto a
+        // resposta ainda estava sendo gerada, o navegador cancelava a leitura
+        // do stream, isso cancelava também a leitura vinda do gateway de IA
+        // (porque os dois liam do mesmo reader), e a resposta da Luna nunca
+        // era salva — na próxima vez que a viagem era aberta, a última
+        // mensagem salva continuava sendo a do usuário, e o app disparava a
+        // Luna de novo do zero, dando a impressão de que a conversa "voltou
+        // pro início" e que nada tinha sido salvo.
+        const [streamForClient, streamForPersistence] = aiRes.body.tee();
+
+        void (async () => {
+          const reader = streamForPersistence.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let full = "";
+          try {
+            for (;;) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              const chunk = decoder.decode(value, { stream: true });
+              const result = extractDeltas(buffer, chunk);
+              buffer = result.buffer;
+              full += result.deltas.join("");
+            }
+          } catch {
+            // conexão com o gateway de IA caiu no meio; nada a persistir
+          }
+          if (full.trim()) {
+            await supabase
+              .from("messages")
+              .insert({ trip_id: trip.id, role: "assistant", content: full });
+          }
+        })();
+
+        const clientReader = streamForClient.getReader();
+        const clientDecoder = new TextDecoder();
         const encoder = new TextEncoder();
-        let full = "";
-        let buffer = "";
+        let clientBuffer = "";
 
         const stream = new ReadableStream<Uint8Array>({
           async pull(controller) {
-            const { done, value } = await reader.read();
+            const { done, value } = await clientReader.read();
             if (done) {
-              if (full.trim()) {
-                await supabase
-                  .from("messages")
-                  .insert({ trip_id: trip.id, role: "assistant", content: full });
-              }
               controller.close();
               return;
             }
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() ?? "";
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed.startsWith("data:")) continue;
-              const payload = trimmed.slice(5).trim();
-              if (payload === "[DONE]") continue;
-              try {
-                const parsed = JSON.parse(payload) as {
-                  choices?: Array<{ delta?: { content?: string } }>;
-                };
-                const delta = parsed.choices?.[0]?.delta?.content;
-                if (delta) {
-                  full += delta;
-                  controller.enqueue(encoder.encode(delta));
-                }
-              } catch {
-                // ignora chunks parciais
-              }
+            const chunk = clientDecoder.decode(value, { stream: true });
+            const result = extractDeltas(clientBuffer, chunk);
+            clientBuffer = result.buffer;
+            for (const delta of result.deltas) {
+              controller.enqueue(encoder.encode(delta));
             }
           },
           cancel() {
-            void reader.cancel();
+            // Cancelar o stream do cliente NÃO deve cancelar a leitura usada
+            // pra persistir no banco (essa é independente, ver acima).
+            void clientReader.cancel();
           },
         });
 
