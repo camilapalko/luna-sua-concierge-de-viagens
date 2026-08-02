@@ -13,6 +13,7 @@ export type ItineraryDay = {
 export type Itinerary = {
   raw: string;
   documentacao: string;
+  hospedagem: string;
   dias: ItineraryDay[];
   restaurantes: string;
   links: string;
@@ -98,6 +99,7 @@ export function parseItinerary(content: string): Itinerary {
   return {
     raw: content,
     documentacao: pick(sections, ["documentacao", "requisitos"]),
+    hospedagem: pick(sections, ["hospedagem"]),
     dias: parseDays(pick(sections, ["roteiro dia", "dia a dia"])),
     restaurantes: pick(sections, ["restaurante"]),
     links: pick(sections, ["links"]),

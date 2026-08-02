@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Sparkles, MessagesSquare, Compass, CheckCircle2, ArrowRight, Star } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { LunaHeroCarousel } from "@/components/LunaHeroCarousel";
+import { PlanningPreviewSection } from "@/components/PlanningPreviewSection";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
@@ -134,6 +135,8 @@ function Home() {
           </div>
           <LunaHeroCarousel />
         </section>
+
+        <PlanningPreviewSection />
 
         <section className="mx-auto max-w-6xl px-4 py-16">
           <h2 className="text-center font-display text-4xl font-semibold">Como funciona</h2>

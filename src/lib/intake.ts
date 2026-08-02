@@ -91,6 +91,20 @@ export const INTAKE_QUESTIONS: IntakeQuestion[] = [
     skip: (a) => a["travelers"] === "Sozinho(a)" || a["travelers"] === "Em casal",
   },
   {
+    id: "children_ages",
+    label: "Idade das crianças",
+    prompt: "Quantos filhos vão e qual a idade aproximada de cada um?",
+    type: "text",
+    placeholder: "Ex: 2 crianças, 5 e 8 anos",
+    suggestions: [
+      "Sem crianças",
+      "1 criança pequena (0-4 anos)",
+      "Crianças de 5-12 anos",
+      "Adolescentes",
+    ],
+    skip: (a) => a["travelers"] !== "Família",
+  },
+  {
     id: "budget_per_person",
     label: "Orçamento por pessoa",
     prompt: "Qual o orçamento aproximado por pessoa?",
@@ -163,6 +177,7 @@ export const INTAKE_QUESTIONS: IntakeQuestion[] = [
       "Relaxamento",
       "Vida Noturna",
       "Compras",
+      "Parques Temáticos & Diversão",
     ],
   },
   {

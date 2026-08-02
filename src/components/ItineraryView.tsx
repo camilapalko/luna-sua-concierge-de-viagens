@@ -122,6 +122,17 @@ export function ItineraryView({ itinerary }: { itinerary: Itinerary }) {
         </AccordionItem>
       </Accordion>
 
+      {itinerary.hospedagem && (
+        <section className="card-luna p-6">
+          <h3 className="flex items-center gap-2 font-display text-xl font-semibold">
+            <BedDouble className="size-4 text-primary" /> Hospedagem sugerida
+          </h3>
+          <div className="mt-4">
+            <Markdown content={itinerary.hospedagem} />
+          </div>
+        </section>
+      )}
+
       {itinerary.dias.length > 0 && (
         <section className="card-luna p-6">
           <h3 className="font-display text-xl font-semibold">Roteiro dia a dia</h3>
