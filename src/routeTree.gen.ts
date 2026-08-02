@@ -15,6 +15,7 @@ import { Route as ChatRouteImport } from './routes/chat'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as MinhasViagensIndexRouteImport } from './routes/minhas-viagens/index'
 import { Route as MinhasViagensTripIdRouteImport } from './routes/minhas-viagens/$tripId'
+import { Route as ApiPublicEnvcheckRouteImport } from './routes/api/public/envcheck'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,6 +47,11 @@ const MinhasViagensTripIdRoute = MinhasViagensTripIdRouteImport.update({
   path: '/minhas-viagens/$tripId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicEnvcheckRoute = ApiPublicEnvcheckRouteImport.update({
+  id: '/api/public/envcheck',
+  path: '/api/public/envcheck',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/minhas-viagens/$tripId': typeof MinhasViagensTripIdRoute
   '/minhas-viagens/': typeof MinhasViagensIndexRoute
+  '/api/public/envcheck': typeof ApiPublicEnvcheckRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/minhas-viagens/$tripId': typeof MinhasViagensTripIdRoute
   '/minhas-viagens': typeof MinhasViagensIndexRoute
+  '/api/public/envcheck': typeof ApiPublicEnvcheckRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,6 +79,7 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/minhas-viagens/$tripId': typeof MinhasViagensTripIdRoute
   '/minhas-viagens/': typeof MinhasViagensIndexRoute
+  '/api/public/envcheck': typeof ApiPublicEnvcheckRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,6 +90,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/minhas-viagens/$tripId'
     | '/minhas-viagens/'
+    | '/api/public/envcheck'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -89,6 +99,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/minhas-viagens/$tripId'
     | '/minhas-viagens'
+    | '/api/public/envcheck'
   id:
     | '__root__'
     | '/'
@@ -97,6 +108,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/minhas-viagens/$tripId'
     | '/minhas-viagens/'
+    | '/api/public/envcheck'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -106,6 +118,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   MinhasViagensTripIdRoute: typeof MinhasViagensTripIdRoute
   MinhasViagensIndexRoute: typeof MinhasViagensIndexRoute
+  ApiPublicEnvcheckRoute: typeof ApiPublicEnvcheckRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -152,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MinhasViagensTripIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/envcheck': {
+      id: '/api/public/envcheck'
+      path: '/api/public/envcheck'
+      fullPath: '/api/public/envcheck'
+      preLoaderRoute: typeof ApiPublicEnvcheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -162,6 +182,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   MinhasViagensTripIdRoute: MinhasViagensTripIdRoute,
   MinhasViagensIndexRoute: MinhasViagensIndexRoute,
+  ApiPublicEnvcheckRoute: ApiPublicEnvcheckRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
