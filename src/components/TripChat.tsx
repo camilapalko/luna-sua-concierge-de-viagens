@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { Send, Sparkles, Plane, BedDouble, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import { LunaLogo } from "@/components/LunaLogo";
 import { isItineraryMessage, parseItinerary } from "@/lib/itinerary";
 import { supabase } from "@/integrations/supabase/client";
 import { searchFlights, searchStays } from "@/lib/travel.functions";
-import type { MessageRow, TripRow } from "@/lib/trips.functions";
+import { updateTripStatus, type MessageRow, type TripRow } from "@/lib/trips.functions";
 import { cn } from "@/lib/utils";
 
 type ChatMessage = Pick<MessageRow, "role" | "content"> & { id?: string };
@@ -31,6 +32,7 @@ export function TripChat({
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const started = useRef(false);
+  const markFinished = useServerFn(updateTripStatus);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -77,6 +79,11 @@ export function TripChat({
         }
         setMessages((prev) => [...prev, { role: "assistant", content: full }]);
         setStreaming("");
+        if (trip.status !== "finalizada" && isItineraryMessage(full)) {
+          markFinished({ data: { tripId: trip.id, status: "finalizada" } }).catch(() => {
+            // silencioso: o roteiro já foi entregue, só o status ficaria desatualizado
+          });
+        }
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Erro ao falar com a Luna.");
       } finally {
@@ -84,7 +91,7 @@ export function TripChat({
         inputRef.current?.focus();
       }
     },
-    [trip.id],
+    [trip.id, trip.status, markFinished],
   );
 
   useEffect(() => {
