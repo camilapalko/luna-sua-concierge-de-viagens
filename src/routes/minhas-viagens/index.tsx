@@ -1,12 +1,23 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CalendarDays, MapPin, Loader2, Plus } from "lucide-react";
+import { CalendarDays, MapPin, Loader2, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { listTrips } from "@/lib/trips.functions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { deleteTrip, listTrips, type TripRow } from "@/lib/trips.functions";
 import { useSession } from "@/hooks/useSession";
 
 export const Route = createFileRoute("/minhas-viagens/")({
@@ -30,7 +41,10 @@ export const Route = createFileRoute("/minhas-viagens/")({
 function TripsPage() {
   const { session, loading } = useSession();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const fetchTrips = useServerFn(listTrips);
+  const removeTrip = useServerFn(deleteTrip);
+  const [tripToDelete, setTripToDelete] = useState<TripRow | null>(null);
 
   useEffect(() => {
     if (!loading && !session) {
@@ -46,6 +60,18 @@ function TripsPage() {
     queryKey: ["trips", session?.user.id],
     queryFn: () => fetchTrips(),
     enabled: Boolean(session),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (tripId: string) => removeTrip({ data: { tripId } }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["trips"] });
+      toast.success("Viagem apagada.");
+      setTripToDelete(null);
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Não consegui apagar essa viagem.");
+    },
   });
 
   return (
@@ -86,26 +112,80 @@ function TripsPage() {
 
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {(data ?? []).map((trip) => (
-            <Link
+            <div
               key={trip.id}
-              to="/minhas-viagens/$tripId"
-              params={{ tripId: trip.id }}
-              className="card-luna block p-6 transition hover:shadow-[var(--shadow-soft)]"
+              className="card-luna relative p-6 transition hover:shadow-[var(--shadow-soft)]"
             >
-              <Badge variant={trip.status === "finalizada" ? "default" : "secondary"}>
-                {trip.status === "finalizada" ? "Finalizada" : "Planejando"}
-              </Badge>
-              <h2 className="mt-4 flex items-center gap-2 font-display text-2xl font-semibold">
-                <MapPin className="size-4 text-primary" /> {trip.destination}
-              </h2>
-              <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                <CalendarDays className="size-3.5" />
-                Criada em {new Date(trip.created_at).toLocaleDateString("pt-BR")}
-              </p>
-            </Link>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-3 top-3 size-8 text-muted-foreground hover:text-destructive"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setTripToDelete(trip);
+                }}
+              >
+                <Trash2 className="size-4" />
+                <span className="sr-only">Apagar viagem</span>
+              </Button>
+
+              <Link
+                to="/minhas-viagens/$tripId"
+                params={{ tripId: trip.id }}
+                className="block pr-8"
+              >
+                <Badge variant={trip.status === "finalizada" ? "default" : "secondary"}>
+                  {trip.status === "finalizada" ? "Finalizada" : "Planejando"}
+                </Badge>
+                <h2 className="mt-4 flex items-center gap-2 font-display text-2xl font-semibold">
+                  <MapPin className="size-4 text-primary" /> {trip.destination}
+                </h2>
+                <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                  <CalendarDays className="size-3.5" />
+                  Criada em {new Date(trip.created_at).toLocaleDateString("pt-BR")}
+                </p>
+              </Link>
+            </div>
           ))}
         </div>
       </main>
+
+      <AlertDialog
+        open={tripToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setTripToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apagar esta viagem?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {tripToDelete
+                ? `Isso vai apagar "${tripToDelete.destination}" e toda a conversa com a Luna. Essa ação não pode ser desfeita.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteMutation.isPending}
+              onClick={() => {
+                if (tripToDelete) deleteMutation.mutate(tripToDelete.id);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="mr-1 size-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-1 size-4" />
+              )}
+              Apagar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

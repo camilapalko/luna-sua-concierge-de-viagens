@@ -66,6 +66,15 @@ export const INTAKE_QUESTIONS: IntakeQuestion[] = [
     type: "dates",
   },
   {
+    id: "trip_duration",
+    label: "Duração da viagem",
+    prompt: "Sem problema! Mais ou menos quantos dias você pretende viajar?",
+    type: "text",
+    placeholder: "Ex: 7 dias",
+    suggestions: ["3 dias", "5 dias", "7 dias", "10 dias", "15 dias", "21 dias ou mais"],
+    skip: (a) => a["dates"] !== "Datas ainda não definidas",
+  },
+  {
     id: "travelers",
     label: "Companhia",
     prompt: "Com quem você vai viajar?",

@@ -64,9 +64,9 @@ function ChatPage() {
     async (finalAnswers: Answers) => {
       if (submitted.current) return;
       submitted.current = true;
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(finalAnswers));
 
       if (!session) {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(finalAnswers));
         void navigate({ to: "/auth", search: { redirect: "/chat" } });
         return;
       }
@@ -81,7 +81,6 @@ function ChatPage() {
             firstMessage: profileSummary(finalAnswers),
           },
         });
-        window.localStorage.removeItem(STORAGE_KEY);
         void navigate({ to: "/minhas-viagens/$tripId", params: { tripId } });
       } catch (error) {
         submitted.current = false;
@@ -92,15 +91,19 @@ function ChatPage() {
     [navigate, session],
   );
 
-  // Retoma o intake respondido antes do login.
+  // Retoma o intake respondido antes do login. Importante: remove a chave do
+  // localStorage IMEDIATAMENTE ao ler, antes de criar a viagem — se essa tela
+  // rodar em duas abas ou recarregar no meio do fluxo de login, isso evita
+  // que a mesma viagem seja criada duas vezes (o que já aconteceu).
   useEffect(() => {
     if (loading || !session || submitted.current) return;
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (!stored) return;
+    window.localStorage.removeItem(STORAGE_KEY);
     try {
       void finish(JSON.parse(stored) as Answers);
     } catch {
-      window.localStorage.removeItem(STORAGE_KEY);
+      // já removido acima, nada mais a fazer
     }
   }, [loading, session, finish]);
 
