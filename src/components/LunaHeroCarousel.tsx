@@ -61,7 +61,7 @@ export function LunaHeroCarousel() {
   const current = (SLIDES[index] ?? SLIDES[0])!;
 
   return (
-    <div className="relative mx-auto aspect-[3/4] w-full max-w-sm overflow-hidden rounded-3xl shadow-[var(--shadow-soft)] md:max-w-none">
+    <div className="relative mx-auto aspect-[3/4] w-full max-w-xs overflow-hidden rounded-3xl shadow-[var(--shadow-soft)] md:max-w-sm">
       {SLIDES.map((slide, i) => (
         <img
           key={slide.src}
