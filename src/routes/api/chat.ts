@@ -14,34 +14,6 @@ function json(body: unknown, status: number) {
   });
 }
 
-/**
- * Extrai os pedaços de texto (delta.content) de um bloco de linhas no
- * formato Server-Sent Events retornado pelo gateway de IA, acumulando
- * qualquer linha incompleta no `buffer` para a próxima chamada.
- */
-function extractDeltas(buffer: string, chunk: string): { deltas: string[]; buffer: string } {
-  const combined = buffer + chunk;
-  const lines = combined.split("\n");
-  const nextBuffer = lines.pop() ?? "";
-  const deltas: string[] = [];
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("data:")) continue;
-    const payload = trimmed.slice(5).trim();
-    if (payload === "[DONE]") continue;
-    try {
-      const parsed = JSON.parse(payload) as {
-        choices?: Array<{ delta?: { content?: string } }>;
-      };
-      const delta = parsed.choices?.[0]?.delta?.content;
-      if (delta) deltas.push(delta);
-    } catch {
-      // ignora chunks parciais que ainda não formam um JSON válido
-    }
-  }
-  return { deltas, buffer: nextBuffer };
-}
-
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
@@ -106,6 +78,15 @@ export const Route = createFileRoute("/api/chat")({
           ...(history ?? []).map((m) => ({ role: m.role, content: m.content })),
         ];
 
+        // Importante: chamamos a Gemini SEM streaming (stream: false) e
+        // esperamos a resposta completa antes de fazer qualquer outra coisa.
+        // Isso é proposital: em ambientes serverless/edge (como o Cloudflare
+        // Workers, usado aqui), não há garantia de que um "trabalho em
+        // segundo plano" (uma promise não aguardada) continue rodando depois
+        // que a conexão original termina ou o cliente se desconecta. Ao
+        // esperar a resposta inteira e SÓ DEPOIS gravar no banco e responder
+        // ao cliente, garantimos que a mensagem nunca é perdida, não importa
+        // o que aconteça com a conexão do usuário.
         const aiRes = await fetch(
           "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
           {
@@ -117,7 +98,7 @@ export const Route = createFileRoute("/api/chat")({
             body: JSON.stringify({
               model: MODEL,
               messages,
-              stream: true,
+              stream: false,
               max_tokens: 32768,
               reasoning_effort: "low",
             }),
@@ -131,80 +112,26 @@ export const Route = createFileRoute("/api/chat")({
             { error: "Chave da IA inválida ou sem permissão. Verifique a GEMINI_API_KEY." },
             500,
           );
-        if (!aiRes.ok || !aiRes.body)
-          return json({ error: "A Luna não conseguiu responder agora." }, 500);
+        if (!aiRes.ok) return json({ error: "A Luna não conseguiu responder agora." }, 500);
 
-        // Importante: usamos tee() para separar o stream em duas cópias
-        // independentes. Uma vai pro cliente (pra exibir a resposta em tempo
-        // real); a outra é consumida aqui no servidor até o fim, INDEPENDENTE
-        // de o cliente continuar conectado, e é ela quem grava a mensagem da
-        // Luna no banco. Antes disso, se o usuário saísse da tela (trocasse
-        // de aba, fechasse o app, navegasse pra "Minhas viagens") enquanto a
-        // resposta ainda estava sendo gerada, o navegador cancelava a leitura
-        // do stream, isso cancelava também a leitura vinda do gateway de IA
-        // (porque os dois liam do mesmo reader), e a resposta da Luna nunca
-        // era salva — na próxima vez que a viagem era aberta, a última
-        // mensagem salva continuava sendo a do usuário, e o app disparava a
-        // Luna de novo do zero, dando a impressão de que a conversa "voltou
-        // pro início" e que nada tinha sido salvo.
-        const [streamForClient, streamForPersistence] = aiRes.body.tee();
+        const data = (await aiRes.json()) as {
+          choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
+        };
+        const choice = data.choices?.[0];
+        const full = choice?.message?.content ?? "";
 
-        void (async () => {
-          const reader = streamForPersistence.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
-          let full = "";
-          try {
-            for (;;) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              const chunk = decoder.decode(value, { stream: true });
-              const result = extractDeltas(buffer, chunk);
-              buffer = result.buffer;
-              full += result.deltas.join("");
-            }
-          } catch {
-            // conexão com o gateway de IA caiu no meio; nada a persistir
-          }
-          if (full.trim()) {
-            await supabase
-              .from("messages")
-              .insert({ trip_id: trip.id, role: "assistant", content: full });
-          }
-        })();
+        if (!full.trim()) {
+          return json(
+            { error: "A Luna não conseguiu responder agora. Tente enviar de novo." },
+            500,
+          );
+        }
 
-        const clientReader = streamForClient.getReader();
-        const clientDecoder = new TextDecoder();
-        const encoder = new TextEncoder();
-        let clientBuffer = "";
+        await supabase
+          .from("messages")
+          .insert({ trip_id: trip.id, role: "assistant", content: full });
 
-        const stream = new ReadableStream<Uint8Array>({
-          async pull(controller) {
-            const { done, value } = await clientReader.read();
-            if (done) {
-              controller.close();
-              return;
-            }
-            const chunk = clientDecoder.decode(value, { stream: true });
-            const result = extractDeltas(clientBuffer, chunk);
-            clientBuffer = result.buffer;
-            for (const delta of result.deltas) {
-              controller.enqueue(encoder.encode(delta));
-            }
-          },
-          cancel() {
-            // Cancelar o stream do cliente NÃO deve cancelar a leitura usada
-            // pra persistir no banco (essa é independente, ver acima).
-            void clientReader.cancel();
-          },
-        });
-
-        return new Response(stream, {
-          headers: {
-            "content-type": "text/plain; charset=utf-8",
-            "cache-control": "no-cache",
-          },
-        });
+        return json({ content: full, truncated: choice?.finish_reason === "length" }, 200);
       },
     },
   },
