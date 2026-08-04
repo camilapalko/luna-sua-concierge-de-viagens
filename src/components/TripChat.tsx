@@ -26,7 +26,6 @@ export function TripChat({
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [draft, setDraft] = useState("");
-  const [streaming, setStreaming] = useState("");
   const [busy, setBusy] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -36,7 +35,7 @@ export function TripChat({
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streaming]);
+  }, [messages, busy]);
 
   useEffect(() => {
     onMessagesChange?.(messages);
@@ -45,7 +44,6 @@ export function TripChat({
   const send = useCallback(
     async (message?: string) => {
       setBusy(true);
-      setStreaming("");
       if (message) {
         setMessages((prev) => [...prev, { role: "user", content: message }]);
       }
@@ -63,27 +61,21 @@ export function TripChat({
           body: JSON.stringify({ tripId: trip.id, message }),
         });
 
-        if (!res.ok || !res.body) {
-          const payload = (await res.json().catch(() => ({}))) as { error?: string };
+        const payload = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          content?: string;
+          truncated?: boolean;
+        };
+
+        if (!res.ok || !payload.content) {
           throw new Error(payload.error ?? "A Luna não conseguiu responder agora.");
         }
 
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let full = "";
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          full += decoder.decode(value, { stream: true });
-          setStreaming(full);
-        }
-
-        if (!full.trim()) {
-          throw new Error("A Luna não conseguiu responder agora. Tente enviar de novo.");
-        }
-
+        const full = payload.content;
         setMessages((prev) => [...prev, { role: "assistant", content: full }]);
-        setStreaming("");
+        if (payload.truncated) {
+          toast.warning("A resposta da Luna pode ter ficado incompleta. Peça para ela continuar.");
+        }
         // Recarrega a viagem do banco: sem isso, a aba "Viagem" pode continuar
         // usando os dados carregados antes dessa resposta (por exemplo, se o
         // usuário trocar de aba e voltar, o chat remonta com os dados antigos
@@ -97,7 +89,6 @@ export function TripChat({
       } catch (error) {
         const text = error instanceof Error ? error.message : "Erro ao falar com a Luna.";
         toast.error(text);
-        setStreaming("");
         // Além do toast (que pode passar despercebido), deixa um aviso visível
         // dentro da própria conversa, pra ficar claro que algo falhou — em vez
         // de a conversa simplesmente "não avançar" sem explicação nenhuma.
@@ -134,8 +125,7 @@ export function TripChat({
             error={message.error}
           />
         ))}
-        {streaming && <Bubble role="assistant" content={streaming} />}
-        {busy && !streaming && (
+        {busy && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <LunaLogo size={28} />
             <span className="flex gap-1">
