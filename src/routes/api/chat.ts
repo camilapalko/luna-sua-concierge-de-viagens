@@ -114,7 +114,7 @@ export const Route = createFileRoute("/api/chat")({
               "Content-Type": "application/json",
               Authorization: `Bearer ${aiKey}`,
             },
-            body: JSON.stringify({ model: MODEL, messages, stream: true }),
+            body: JSON.stringify({ model: MODEL, messages, stream: true, max_tokens: 8192 }),
           },
         );
 
