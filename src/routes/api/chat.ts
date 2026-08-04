@@ -5,7 +5,7 @@ import type { Database } from "@/integrations/supabase/types";
 
 type Body = { tripId?: string; message?: string };
 
-const MODEL = "google/gemini-3.6-flash";
+const MODEL = "gemini-3.6-flash";
 
 function json(body: unknown, status: number) {
   return new Response(JSON.stringify(body), {
@@ -52,7 +52,7 @@ export const Route = createFileRoute("/api/chat")({
 
         const supabaseUrl = process.env["SUPABASE_URL"];
         const supabaseKey = process.env["SUPABASE_PUBLISHABLE_KEY"];
-        const aiKey = process.env["LOVABLE_API_KEY"];
+        const aiKey = process.env["GEMINI_API_KEY"];
         if (!supabaseUrl || !supabaseKey) return json({ error: "Backend indisponível." }, 500);
         if (!aiKey) return json({ error: "Serviço de IA indisponível." }, 500);
 
@@ -106,22 +106,24 @@ export const Route = createFileRoute("/api/chat")({
           ...(history ?? []).map((m) => ({ role: m.role, content: m.content })),
         ];
 
-        const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Lovable-API-Key": aiKey,
-            "X-Lovable-AIG-SDK": "fetch",
+        const aiRes = await fetch(
+          "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${aiKey}`,
+            },
+            body: JSON.stringify({ model: MODEL, messages, stream: true }),
           },
-          body: JSON.stringify({ model: MODEL, messages, stream: true }),
-        });
+        );
 
         if (aiRes.status === 429)
           return json({ error: "Muitas mensagens em pouco tempo. Aguarde um instante." }, 429);
-        if (aiRes.status === 402)
+        if (aiRes.status === 401 || aiRes.status === 403)
           return json(
-            { error: "Os créditos de IA acabaram. Adicione créditos para continuar." },
-            402,
+            { error: "Chave da IA inválida ou sem permissão. Verifique a GEMINI_API_KEY." },
+            500,
           );
         if (!aiRes.ok || !aiRes.body)
           return json({ error: "A Luna não conseguiu responder agora." }, 500);
