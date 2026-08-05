@@ -65,6 +65,7 @@ export function TripChat({
           error?: string;
           content?: string;
           truncated?: boolean;
+          debug?: { finishReason?: string; usage?: Record<string, number> };
         };
 
         if (!res.ok || !payload.content) {
@@ -74,7 +75,14 @@ export function TripChat({
         const full = payload.content;
         setMessages((prev) => [...prev, { role: "assistant", content: full }]);
         if (payload.truncated) {
-          toast.warning("A resposta da Luna pode ter ficado incompleta. Peça para ela continuar.");
+          const usage = payload.debug?.usage;
+          const usageText = usage
+            ? ` (tokens: ${usage["completion_tokens"] ?? "?"} de saída, ${usage["prompt_tokens"] ?? "?"} de entrada)`
+            : "";
+          toast.warning(
+            `Resposta pode ter ficado incompleta. Motivo: ${payload.debug?.finishReason ?? "desconhecido"}${usageText}`,
+            { duration: 15000 },
+          );
         }
         // Recarrega a viagem do banco: sem isso, a aba "Viagem" pode continuar
         // usando os dados carregados antes dessa resposta (por exemplo, se o

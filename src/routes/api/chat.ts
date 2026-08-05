@@ -99,7 +99,7 @@ export const Route = createFileRoute("/api/chat")({
               model: MODEL,
               messages,
               stream: false,
-              max_tokens: 32768,
+              max_tokens: 65536,
               reasoning_effort: "low",
             }),
           },
@@ -116,13 +116,18 @@ export const Route = createFileRoute("/api/chat")({
 
         const data = (await aiRes.json()) as {
           choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
+          usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
         };
         const choice = data.choices?.[0];
         const full = choice?.message?.content ?? "";
+        const finishReason = choice?.finish_reason ?? "desconhecido";
+        const usage = data.usage;
 
         if (!full.trim()) {
           return json(
-            { error: "A Luna não conseguiu responder agora. Tente enviar de novo." },
+            {
+              error: `A Luna não conseguiu responder agora. (finish_reason: ${finishReason})`,
+            },
             500,
           );
         }
@@ -131,7 +136,14 @@ export const Route = createFileRoute("/api/chat")({
           .from("messages")
           .insert({ trip_id: trip.id, role: "assistant", content: full });
 
-        return json({ content: full, truncated: choice?.finish_reason === "length" }, 200);
+        return json(
+          {
+            content: full,
+            truncated: finishReason !== "stop",
+            debug: { finishReason, usage },
+          },
+          200,
+        );
       },
     },
   },
