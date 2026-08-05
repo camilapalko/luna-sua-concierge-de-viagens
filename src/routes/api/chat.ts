@@ -87,9 +87,18 @@ export const Route = createFileRoute("/api/chat")({
         // esperar a resposta inteira e SÓ DEPOIS gravar no banco e responder
         // ao cliente, garantimos que a mensagem nunca é perdida, não importa
         // o que aconteça com a conexão do usuário.
-        const aiRes = await fetch(
-          "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-          {
+        //
+        // 65.536 tokens de saída é o teto FIXO do modelo gemini-3.6-flash —
+        // não dá pra configurar um valor maior. Para roteiros muito longos
+        // (ex: 15 dias, 6 pessoas) essa resposta pode cortar no meio. Quando
+        // isso acontece (finish_reason indicando corte por limite de
+        // tokens), fazemos automaticamente uma ou mais chamadas extras
+        // pedindo pra Gemini continuar exatamente de onde parou, e juntamos
+        // tudo antes de salvar/responder — o usuário nunca vê o corte.
+        type AiMessage = { role: string; content: string };
+
+        async function callGemini(conversation: AiMessage[]) {
+          return fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -97,37 +106,79 @@ export const Route = createFileRoute("/api/chat")({
             },
             body: JSON.stringify({
               model: MODEL,
-              messages,
+              messages: conversation,
               stream: false,
               max_tokens: 65536,
               reasoning_effort: "low",
             }),
-          },
-        );
+          });
+        }
 
-        if (aiRes.status === 429)
-          return json({ error: "Muitas mensagens em pouco tempo. Aguarde um instante." }, 429);
-        if (aiRes.status === 401 || aiRes.status === 403)
-          return json(
-            { error: "Chave da IA inválida ou sem permissão. Verifique a GEMINI_API_KEY." },
-            500,
-          );
-        if (!aiRes.ok) return json({ error: "A Luna não conseguiu responder agora." }, 500);
+        const MAX_CONTINUATIONS = 3;
+        const CONTINUE_INSTRUCTION =
+          "Continue a resposta anterior EXATAMENTE de onde ela parou. Não repita nada do que já foi escrito, não reinicie o texto nem adicione saudações — apenas continue a partir da última palavra ou frase incompleta.";
 
-        const data = (await aiRes.json()) as {
-          choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
-          usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
-        };
-        const choice = data.choices?.[0];
-        const full = choice?.message?.content ?? "";
-        const finishReason = choice?.finish_reason ?? "desconhecido";
-        const usage = data.usage;
+        let conversation: AiMessage[] = [...messages];
+        let full = "";
+        let finishReason = "desconhecido";
+        const totalUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+        let round = 0;
+
+        while (round <= MAX_CONTINUATIONS) {
+          const aiRes = await callGemini(conversation);
+
+          if (aiRes.status === 429) {
+            if (full.trim()) break;
+            return json({ error: "Muitas mensagens em pouco tempo. Aguarde um instante." }, 429);
+          }
+          if (aiRes.status === 401 || aiRes.status === 403) {
+            if (full.trim()) break;
+            return json(
+              { error: "Chave da IA inválida ou sem permissão. Verifique a GEMINI_API_KEY." },
+              500,
+            );
+          }
+          if (!aiRes.ok) {
+            if (full.trim()) break;
+            return json({ error: "A Luna não conseguiu responder agora." }, 500);
+          }
+
+          const data = (await aiRes.json()) as {
+            choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
+            usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+          };
+          const choice = data.choices?.[0];
+          const chunk = choice?.message?.content ?? "";
+          finishReason = choice?.finish_reason ?? "desconhecido";
+
+          if (data.usage) {
+            totalUsage.prompt_tokens += data.usage.prompt_tokens ?? 0;
+            totalUsage.completion_tokens += data.usage.completion_tokens ?? 0;
+            totalUsage.total_tokens += data.usage.total_tokens ?? 0;
+          }
+
+          full += chunk;
+
+          const normalizedReason = finishReason.toLowerCase().replace(/_/g, "");
+          const isLengthCut = normalizedReason === "length" || normalizedReason === "maxtokens";
+
+          if (!isLengthCut || round === MAX_CONTINUATIONS) break;
+
+          // Próxima rodada: acrescenta o que já foi gerado como resposta do
+          // assistente e pede pra continuar. Essas mensagens intermediárias
+          // NÃO são salvas no banco — só o texto final concatenado vira uma
+          // única mensagem no histórico da viagem.
+          conversation = [
+            ...conversation,
+            { role: "assistant", content: chunk },
+            { role: "user", content: CONTINUE_INSTRUCTION },
+          ];
+          round += 1;
+        }
 
         if (!full.trim()) {
           return json(
-            {
-              error: `A Luna não conseguiu responder agora. (finish_reason: ${finishReason})`,
-            },
+            { error: `A Luna não conseguiu responder agora. (finish_reason: ${finishReason})` },
             500,
           );
         }
@@ -136,11 +187,15 @@ export const Route = createFileRoute("/api/chat")({
           .from("messages")
           .insert({ trip_id: trip.id, role: "assistant", content: full });
 
+        const normalizedFinal = finishReason.toLowerCase().replace(/_/g, "");
+        const stillTruncated =
+          (normalizedFinal === "length" || normalizedFinal === "maxtokens") && round >= MAX_CONTINUATIONS;
+
         return json(
           {
             content: full,
-            truncated: finishReason !== "stop",
-            debug: { finishReason, usage },
+            truncated: stillTruncated,
+            debug: { finishReason, usage: totalUsage, continuations: round },
           },
           200,
         );
