@@ -23,7 +23,13 @@ export type Itinerary = {
 };
 
 export function isItineraryMessage(content: string): boolean {
-  return content.trimStart().startsWith(ITINERARY_MARKER);
+  // Antes exigíamos que a mensagem começasse EXATAMENTE com o marcador. Só
+  // que a Luna às vezes abre a resposta final com uma frase de transição
+  // (ex.: "Você tem toda razão! Vamos detalhar tudo...") antes do roteiro
+  // propriamente dito — isso fazia o roteiro nunca aparecer na aba "Viagem",
+  // mesmo depois de completo no chat. Basta o marcador aparecer em algum
+  // lugar da mensagem: o parseItinerary já ignora qualquer texto antes dele.
+  return content.includes(ITINERARY_MARKER);
 }
 
 function normalize(value: string): string {
