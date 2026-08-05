@@ -88,13 +88,6 @@ function LinkCards({ body, empty }: { body: string; empty: string }) {
 }
 
 export function ItineraryView({ itinerary }: { itinerary: Itinerary }) {
-  const linkSection = itinerary.links;
-  const filterLinks = (keyword: RegExp) =>
-    linkSection
-      .split("\n")
-      .filter((line) => keyword.test(line) || /^#{2,4}\s/.test(line))
-      .join("\n");
-
   return (
     <div className="space-y-6">
       <header className="rounded-2xl bg-gradient-to-br from-primary/10 via-secondary/40 to-accent/30 p-6">
@@ -185,19 +178,13 @@ export function ItineraryView({ itinerary }: { itinerary: Itinerary }) {
             <TabsTrigger value="essencial">Essencial</TabsTrigger>
           </TabsList>
           <TabsContent value="transporte" className="pt-5">
-            <LinkCards
-              body={filterLinks(/voo|transporte|flight/i)}
-              empty="Sem links de transporte."
-            />
+            <LinkCards body={itinerary.linksVoos} empty="Sem links de transporte." />
           </TabsContent>
           <TabsContent value="hospedagem" className="pt-5">
-            <LinkCards
-              body={filterLinks(/hosped|hotel|booking/i)}
-              empty="Sem links de hospedagem."
-            />
+            <LinkCards body={itinerary.linksHospedagem} empty="Sem links de hospedagem." />
           </TabsContent>
           <TabsContent value="passeios" className="pt-5">
-            <LinkCards body={filterLinks(/passeio|tour|ticket/i)} empty="Sem links de passeios." />
+            <LinkCards body={itinerary.linksPasseios} empty="Sem links de passeios." />
           </TabsContent>
           <TabsContent value="documentos" className="pt-5">
             {itinerary.documentacao ? (

@@ -17,6 +17,9 @@ export type Itinerary = {
   dias: ItineraryDay[];
   restaurantes: string;
   links: string;
+  linksVoos: string;
+  linksHospedagem: string;
+  linksPasseios: string;
   checklist: string[];
   essencial: string;
   dicas: string;
@@ -100,8 +103,29 @@ function parseChecklist(body: string): string[] {
     .filter(Boolean);
 }
 
+// Divide o corpo da seção "Links para Reservas" pelos subtítulos de nível 3
+// (### Voos, ### Hospedagem, ### Passeios), do mesmo jeito que parseDays faz
+// para os dias do roteiro. Antes a separação por grupo era feita filtrando
+// linhas por palavra-chave (ex.: /passeio|tour|ticket/i) — mas isso quebra
+// sempre que o nome do provedor não contém uma dessas palavras (ex.:
+// "GetYourGuide" não tem "tour" nem "passeio"), fazendo a aba correspondente
+// mostrar só os títulos soltos, sem nenhum link. Separar por subtítulo real
+// não depende do texto do link.
+function splitSubsections(body: string): Record<string, string> {
+  const sections: Record<string, string> = {};
+  const parts = body.split(/^###\s+/m).slice(1);
+  for (const part of parts) {
+    const newline = part.indexOf("\n");
+    const title = normalize(newline === -1 ? part : part.slice(0, newline));
+    const content = newline === -1 ? "" : part.slice(newline + 1).trim();
+    sections[title] = content;
+  }
+  return sections;
+}
+
 export function parseItinerary(content: string): Itinerary {
   const sections = splitSections(content);
+  const linkGroups = splitSubsections(pick(sections, ["links"]));
   return {
     raw: content,
     documentacao: pick(sections, ["documentacao", "requisitos"]),
@@ -109,6 +133,9 @@ export function parseItinerary(content: string): Itinerary {
     dias: parseDays(pick(sections, ["roteiro dia", "dia a dia"])),
     restaurantes: pick(sections, ["restaurante"]),
     links: pick(sections, ["links"]),
+    linksVoos: pick(linkGroups, ["voo"]),
+    linksHospedagem: pick(linkGroups, ["hosped"]),
+    linksPasseios: pick(linkGroups, ["passeio"]),
     checklist: parseChecklist(pick(sections, ["checklist"])),
     essencial: pick(sections, ["essencial"]),
     dicas: pick(sections, ["dicas"]),
