@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TripChat } from "@/components/TripChat";
 import { ItineraryView } from "@/components/ItineraryView";
 import { findLatestItinerary } from "@/lib/itinerary";
-import { getTrip, type MessageRow } from "@/lib/trips.functions";
+import { getTrip, updateTripStatus, type MessageRow } from "@/lib/trips.functions";
 import { useSession } from "@/hooks/useSession";
 
 export const Route = createFileRoute("/minhas-viagens/$tripId")({
@@ -36,7 +36,10 @@ function TripPage() {
   const { session, loading } = useSession();
   const navigate = useNavigate();
   const fetchTrip = useServerFn(getTrip);
+  const markFinished = useServerFn(updateTripStatus);
+  const queryClient = useQueryClient();
   const [liveMessages, setLiveMessages] = useState<Array<Pick<MessageRow, "role" | "content">>>([]);
+  const syncedStatus = useRef(false);
 
   useEffect(() => {
     if (!loading && !session) {
@@ -66,6 +69,25 @@ function TripPage() {
     );
     return findLatestItinerary([...base, ...extra]);
   }, [liveMessages, data]);
+
+  // Autocorreção: normalmente o status vira "finalizada" no momento em que o
+  // chat recebe a resposta com o roteiro (ver TripChat.tsx). Mas se por
+  // qualquer motivo isso não disparar naquele momento (erro de rede, resposta
+  // fora do formato esperado antes de uma correção de prompt, etc.), a
+  // viagem ficava presa em "Planejando" para sempre, mesmo com o roteiro já
+  // completo. Aqui, sempre que a aba Viagem detectar um roteiro válido e o
+  // status do banco ainda não estiver "finalizada", corrigimos sozinhos.
+  useEffect(() => {
+    if (!itinerary || !data?.trip || data.trip.status === "finalizada" || syncedStatus.current) {
+      return;
+    }
+    syncedStatus.current = true;
+    markFinished({ data: { tripId: data.trip.id, status: "finalizada" } })
+      .then(() => queryClient.invalidateQueries({ queryKey: ["trip", tripId] }))
+      .catch(() => {
+        syncedStatus.current = false;
+      });
+  }, [itinerary, data, markFinished, queryClient, tripId]);
 
   if (loading || isLoading || !data) {
     return (
