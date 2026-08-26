@@ -40,7 +40,6 @@ const DIETARY_OPTIONS = [
   "Nenhuma",
 ];
 const ACCOMMODATION_OPTIONS = ["Hotel", "Resort", "Apartamento/Airbnb", "Pousada boutique", "Hostel"];
-const PACE_OPTIONS = ["Relaxado", "Moderado", "Intenso"];
 
 function ChipGroup({
   options,
@@ -263,17 +262,6 @@ function PerfilPage() {
                     : []
                 }
                 onPick={(value) => setSingle("accommodation_type", value)}
-              />
-            </div>
-          </section>
-
-          <section className="card-luna p-6">
-            <h2 className="font-display text-lg font-semibold">Ritmo de viagem</h2>
-            <div className="mt-3">
-              <ChipGroup
-                options={PACE_OPTIONS}
-                selected={typeof defaults["travel_pace"] === "string" ? [defaults["travel_pace"]] : []}
-                onPick={(value) => setSingle("travel_pace", value)}
               />
             </div>
           </section>

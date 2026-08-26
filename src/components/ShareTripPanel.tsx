@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { enableSharing, disableSharing } from "@/lib/sharing.functions";
+import { SITE_URL } from "@/lib/site";
 import type { TripRow } from "@/lib/trips.functions";
 
 // Painel de compartilhamento: gera um link público que mostra SÓ o roteiro
@@ -25,9 +26,7 @@ export function ShareTripPanel({
   const [copied, setCopied] = useState(false);
 
   const shareUrl =
-    trip.share_enabled && trip.share_token
-      ? `${window.location.origin}/roteiro/${trip.share_token}`
-      : null;
+    trip.share_enabled && trip.share_token ? `${SITE_URL}/roteiro/${trip.share_token}` : null;
 
   async function copyLink(url: string) {
     try {
@@ -45,7 +44,7 @@ export function ShareTripPanel({
     try {
       const { token } = await doEnable({ data: { tripId: trip.id } });
       onChange?.();
-      await copyLink(`${window.location.origin}/roteiro/${token}`);
+      await copyLink(`${SITE_URL}/roteiro/${token}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não consegui gerar o link.");
     } finally {
