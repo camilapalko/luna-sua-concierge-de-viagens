@@ -148,7 +148,10 @@ export const INTAKE_QUESTIONS: IntakeQuestion[] = [
     prompt: "Suas datas são flexíveis?",
     type: "single",
     options: ["Datas fixas", "Flexível 1–3 dias", "Flexível 1 semana", "Bem flexível"],
-    skip: isOnlyTours,
+    // Não faz sentido perguntar se as datas são flexíveis quando a pessoa
+    // ainda nem escolheu quando vai viajar — essa pergunta só importa depois
+    // que já existe uma data de referência para ser (in)flexível em torno dela.
+    skip: (a) => isOnlyTours(a) || a["dates"] === "Datas ainda não definidas",
   },
   {
     id: "accommodation_type",

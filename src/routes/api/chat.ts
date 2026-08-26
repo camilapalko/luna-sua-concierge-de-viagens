@@ -114,6 +114,21 @@ export const Route = createFileRoute("/api/chat")({
           });
         }
 
+        // A API da Gemini às vezes falha de forma transitória (5xx, sobrecarga
+        // momentânea) mesmo com tudo certo do nosso lado. Antes, qualquer
+        // falha assim já desistia na hora e mostrava um erro genérico sem
+        // nenhuma pista do que aconteceu. Agora: (1) tentamos de novo uma vez
+        // após uma pequena espera se for um erro 5xx, e (2) se ainda assim
+        // falhar, incluímos o status HTTP e um trecho da resposta da Gemini
+        // na mensagem de erro, para dar pra diagnosticar de verdade da
+        // próxima vez, em vez de adivinhar.
+        async function callGeminiWithRetry(conversation: AiMessage[]) {
+          const first = await callGemini(conversation);
+          if (first.status < 500) return first;
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          return callGemini(conversation);
+        }
+
         const MAX_CONTINUATIONS = 3;
         const CONTINUE_INSTRUCTION =
           "Continue a resposta anterior EXATAMENTE de onde ela parou. Não repita nada do que já foi escrito, não reinicie o texto nem adicione saudações — apenas continue a partir da última palavra ou frase incompleta.";
@@ -125,7 +140,7 @@ export const Route = createFileRoute("/api/chat")({
         let round = 0;
 
         while (round <= MAX_CONTINUATIONS) {
-          const aiRes = await callGemini(conversation);
+          const aiRes = await callGeminiWithRetry(conversation);
 
           if (aiRes.status === 429) {
             if (full.trim()) break;
@@ -140,7 +155,14 @@ export const Route = createFileRoute("/api/chat")({
           }
           if (!aiRes.ok) {
             if (full.trim()) break;
-            return json({ error: "A Luna não conseguiu responder agora." }, 500);
+            const bodyText = await aiRes.text().catch(() => "");
+            const snippet = bodyText.slice(0, 300);
+            return json(
+              {
+                error: `A Luna não conseguiu responder agora. (HTTP ${aiRes.status}${snippet ? `: ${snippet}` : ""})`,
+              },
+              500,
+            );
           }
 
           const data = (await aiRes.json()) as {
