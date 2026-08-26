@@ -13,6 +13,7 @@ import {
   profileSummary,
   formatAnswer,
   visibleQuestions,
+  toggleMultiOption,
   type Answers,
 } from "@/lib/intake";
 import { createTrip } from "@/lib/trips.functions";
@@ -163,11 +164,7 @@ function ChatPage() {
                           key={option}
                           type="button"
                           onClick={() =>
-                            setMulti((prev) =>
-                              prev.includes(option)
-                                ? prev.filter((item) => item !== option)
-                                : [...prev, option],
-                            )
+                            setMulti((prev) => toggleMultiOption(question.id, prev, option))
                           }
                           className={`rounded-full border px-4 py-2 text-sm transition ${
                             active

@@ -13,6 +13,13 @@ export type IntakeQuestion = {
 
 const isOnlyTours = (a: Answers) => a["service_type"] !== "Viagem Completa";
 
+// Ordem pensada em blocos que fazem sentido conversar juntos, um assunto de
+// cada vez, em vez de pular entre temas: (1) quem/o quê, (2) quando, (3) com
+// quem, (4) orçamento, (5) logística de voo/hospedagem, (6) preferências de
+// experiência, (7) pedidos finais. Isso evita, por exemplo, perguntar sobre
+// flexibilidade de datas bem longe da pergunta de datas, ou perguntar
+// orçamento em R$ e só muito depois perguntar de novo (com outras palavras)
+// se a pessoa quer algo econômico ou de luxo.
 export const INTAKE_QUESTIONS: IntakeQuestion[] = [
   {
     id: "service_type",
@@ -75,6 +82,17 @@ export const INTAKE_QUESTIONS: IntakeQuestion[] = [
     skip: (a) => a["dates"] !== "Datas ainda não definidas",
   },
   {
+    id: "date_flexibility",
+    label: "Flexibilidade de datas",
+    prompt: "Suas datas são flexíveis?",
+    type: "single",
+    options: ["Datas fixas", "Flexível 1–3 dias", "Flexível 1 semana", "Bem flexível"],
+    // Não faz sentido perguntar se as datas são flexíveis quando a pessoa
+    // ainda nem escolheu quando vai viajar — essa pergunta só importa depois
+    // que já existe uma data de referência para ser (in)flexível em torno dela.
+    skip: (a) => isOnlyTours(a) || a["dates"] === "Datas ainda não definidas",
+  },
+  {
     id: "travelers",
     label: "Companhia",
     prompt: "Com quem você vai viajar?",
@@ -119,6 +137,16 @@ export const INTAKE_QUESTIONS: IntakeQuestion[] = [
     ],
   },
   {
+    id: "budget",
+    label: "Estilo de viagem",
+    // Fica logo depois do orçamento em R$ de propósito: ali é "quanto",
+    // aqui é "que tipo de experiência" (ex.: dá pra ter um orçamento alto e
+    // ainda assim preferir uma viagem mais simples/econômica no estilo).
+    prompt: "E dentro desse valor, qual estilo de viagem combina mais com você?",
+    type: "single",
+    options: ["Econômico", "Moderado", "Luxo", "Flexível"],
+  },
+  {
     id: "flight_time_pref",
     label: "Horário de voo",
     prompt: "Você prefere voar em qual horário?",
@@ -143,30 +171,12 @@ export const INTAKE_QUESTIONS: IntakeQuestion[] = [
     skip: isOnlyTours,
   },
   {
-    id: "date_flexibility",
-    label: "Flexibilidade de datas",
-    prompt: "Suas datas são flexíveis?",
-    type: "single",
-    options: ["Datas fixas", "Flexível 1–3 dias", "Flexível 1 semana", "Bem flexível"],
-    // Não faz sentido perguntar se as datas são flexíveis quando a pessoa
-    // ainda nem escolheu quando vai viajar — essa pergunta só importa depois
-    // que já existe uma data de referência para ser (in)flexível em torno dela.
-    skip: (a) => isOnlyTours(a) || a["dates"] === "Datas ainda não definidas",
-  },
-  {
     id: "accommodation_type",
     label: "Hospedagem",
     prompt: "Que tipo de hospedagem combina mais com você?",
     type: "single",
     options: ["Hotel", "Resort", "Apartamento/Airbnb", "Pousada boutique", "Hostel"],
     skip: isOnlyTours,
-  },
-  {
-    id: "budget",
-    label: "Estilo de viagem",
-    prompt: "Qual estilo de viagem você busca?",
-    type: "single",
-    options: ["Econômico", "Moderado", "Luxo", "Flexível"],
   },
   {
     id: "interests",
@@ -213,6 +223,40 @@ export const INTAKE_QUESTIONS: IntakeQuestion[] = [
     ],
   },
 ];
+
+// Opção "exclusiva" dentro de uma pergunta de múltipla escolha: marcá-la
+// desmarca todo o resto (e vice-versa). Hoje só "Nenhuma" em restrições
+// alimentares precisa disso — sem essa regra dava pra selecionar "Vegano" e
+// "Nenhuma" ao mesmo tempo, mandando pra Luna um perfil contraditório.
+const EXCLUSIVE_OPTIONS: Record<string, string> = {
+  dietary_restrictions: "Nenhuma",
+};
+
+export function exclusiveOptionFor(questionId: string): string | undefined {
+  return EXCLUSIVE_OPTIONS[questionId];
+}
+
+export function toggleMultiOption(
+  questionId: string,
+  selected: string[],
+  option: string,
+): string[] {
+  const exclusive = exclusiveOptionFor(questionId);
+  if (!exclusive) {
+    return selected.includes(option)
+      ? selected.filter((item) => item !== option)
+      : [...selected, option];
+  }
+
+  if (option === exclusive) {
+    return selected.includes(exclusive) ? [] : [exclusive];
+  }
+
+  const withoutExclusive = selected.filter((item) => item !== exclusive);
+  return withoutExclusive.includes(option)
+    ? withoutExclusive.filter((item) => item !== option)
+    : [...withoutExclusive, option];
+}
 
 export function visibleQuestions(answers: Answers): IntakeQuestion[] {
   return INTAKE_QUESTIONS.filter((q) => !q.skip?.(answers));

@@ -51,8 +51,11 @@ export type Database = {
           created_at: string
           destination: string
           id: string
+          itinerary_content: string | null
           origin: string | null
           profile: Json
+          share_enabled: boolean
+          share_token: string | null
           status: Database["public"]["Enums"]["trip_status"]
           title: string | null
           updated_at: string
@@ -62,8 +65,11 @@ export type Database = {
           created_at?: string
           destination?: string
           id?: string
+          itinerary_content?: string | null
           origin?: string | null
           profile?: Json
+          share_enabled?: boolean
+          share_token?: string | null
           status?: Database["public"]["Enums"]["trip_status"]
           title?: string | null
           updated_at?: string
@@ -73,8 +79,11 @@ export type Database = {
           created_at?: string
           destination?: string
           id?: string
+          itinerary_content?: string | null
           origin?: string | null
           profile?: Json
+          share_enabled?: boolean
+          share_token?: string | null
           status?: Database["public"]["Enums"]["trip_status"]
           title?: string | null
           updated_at?: string

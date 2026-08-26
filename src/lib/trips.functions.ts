@@ -9,6 +9,9 @@ export type TripRow = {
   status: "planejando" | "finalizada";
   profile: Record<string, string | string[]>;
   created_at: string;
+  share_token: string | null;
+  share_enabled: boolean;
+  itinerary_content: string | null;
 };
 
 export type MessageRow = {
@@ -35,7 +38,9 @@ export const getTrip = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { data: trip, error } = await context.supabase
       .from("trips")
-      .select("id, destination, origin, title, status, profile, created_at")
+      .select(
+        "id, destination, origin, title, status, profile, created_at, share_token, share_enabled, itinerary_content",
+      )
       .eq("id", data.tripId)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -90,11 +95,23 @@ export const createTrip = createServerFn({ method: "POST" })
 
 export const updateTripStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { tripId: string; status: "planejando" | "finalizada" }) => input)
+  .inputValidator(
+    (input: { tripId: string; status: "planejando" | "finalizada"; itineraryContent?: string }) =>
+      input,
+  )
   .handler(async ({ data, context }) => {
+    // Sempre que a viagem vira "finalizada" (ou é reconfirmada assim depois
+    // de uma edição), guardamos o texto bruto do roteiro em itinerary_content.
+    // É esse campo — e só ele — que alimenta a página pública de
+    // compartilhamento, mantendo a conversa inteira fora do link público.
+    const update: { status: "planejando" | "finalizada"; itinerary_content?: string } = {
+      status: data.status,
+    };
+    if (data.itineraryContent) update.itinerary_content = data.itineraryContent;
+
     const { error } = await context.supabase
       .from("trips")
-      .update({ status: data.status })
+      .update(update)
       .eq("id", data.tripId);
     if (error) throw new Error(error.message);
     return { ok: true };

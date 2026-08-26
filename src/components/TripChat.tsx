@@ -89,9 +89,15 @@ export function TripChat({
         // usuário trocar de aba e voltar, o chat remonta com os dados antigos
         // e "esconde" o roteiro recém-gerado até um refresh manual).
         void queryClient.invalidateQueries({ queryKey: ["trip", trip.id] });
-        if (trip.status !== "finalizada" && isItineraryMessage(full)) {
-          markFinished({ data: { tripId: trip.id, status: "finalizada" } }).catch(() => {
-            // silencioso: o roteiro já foi entregue, só o status ficaria desatualizado
+        if (isItineraryMessage(full)) {
+          // Chama sempre que a resposta tiver o roteiro completo — mesmo se a
+          // viagem já estava "finalizada" antes (edição pós-finalização) —
+          // porque também precisamos atualizar itinerary_content com a nova
+          // versão, não só o status.
+          markFinished({
+            data: { tripId: trip.id, status: "finalizada", itineraryContent: full },
+          }).catch(() => {
+            // silencioso: o roteiro já foi entregue, só o status/link compartilhado ficariam desatualizados
           });
         }
       } catch (error) {

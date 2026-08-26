@@ -15,6 +15,7 @@ import { Route as ChatRouteImport } from './routes/chat'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as MinhasViagensIndexRouteImport } from './routes/minhas-viagens/index'
 import { Route as MinhasViagensTripIdRouteImport } from './routes/minhas-viagens/$tripId'
+import { Route as RoteiroTokenRouteImport } from './routes/roteiro/$token'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,6 +47,11 @@ const MinhasViagensTripIdRoute = MinhasViagensTripIdRouteImport.update({
   path: '/minhas-viagens/$tripId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RoteiroTokenRoute = RoteiroTokenRouteImport.update({
+  id: '/roteiro/$token',
+  path: '/roteiro/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/chat': typeof ChatRoute
   '/api/chat': typeof ApiChatRoute
   '/minhas-viagens/$tripId': typeof MinhasViagensTripIdRoute
+  '/roteiro/$token': typeof RoteiroTokenRoute
   '/minhas-viagens/': typeof MinhasViagensIndexRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/chat': typeof ChatRoute
   '/api/chat': typeof ApiChatRoute
   '/minhas-viagens/$tripId': typeof MinhasViagensTripIdRoute
+  '/roteiro/$token': typeof RoteiroTokenRoute
   '/minhas-viagens': typeof MinhasViagensIndexRoute
 }
 export interface FileRoutesById {
@@ -70,6 +78,7 @@ export interface FileRoutesById {
   '/chat': typeof ChatRoute
   '/api/chat': typeof ApiChatRoute
   '/minhas-viagens/$tripId': typeof MinhasViagensTripIdRoute
+  '/roteiro/$token': typeof RoteiroTokenRoute
   '/minhas-viagens/': typeof MinhasViagensIndexRoute
 }
 export interface FileRouteTypes {
@@ -80,6 +89,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/api/chat'
     | '/minhas-viagens/$tripId'
+    | '/roteiro/$token'
     | '/minhas-viagens/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -88,6 +98,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/api/chat'
     | '/minhas-viagens/$tripId'
+    | '/roteiro/$token'
     | '/minhas-viagens'
   id:
     | '__root__'
@@ -96,6 +107,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/api/chat'
     | '/minhas-viagens/$tripId'
+    | '/roteiro/$token'
     | '/minhas-viagens/'
   fileRoutesById: FileRoutesById
 }
@@ -105,6 +117,7 @@ export interface RootRouteChildren {
   ChatRoute: typeof ChatRoute
   ApiChatRoute: typeof ApiChatRoute
   MinhasViagensTripIdRoute: typeof MinhasViagensTripIdRoute
+  RoteiroTokenRoute: typeof RoteiroTokenRoute
   MinhasViagensIndexRoute: typeof MinhasViagensIndexRoute
 }
 
@@ -152,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MinhasViagensTripIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/roteiro/$token': {
+      id: '/roteiro/$token'
+      path: '/roteiro/$token'
+      fullPath: '/roteiro/$token'
+      preLoaderRoute: typeof RoteiroTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -161,6 +181,7 @@ const rootRouteChildren: RootRouteChildren = {
   ChatRoute: ChatRoute,
   ApiChatRoute: ApiChatRoute,
   MinhasViagensTripIdRoute: MinhasViagensTripIdRoute,
+  RoteiroTokenRoute: RoteiroTokenRoute,
   MinhasViagensIndexRoute: MinhasViagensIndexRoute,
 }
 export const routeTree = rootRouteImport

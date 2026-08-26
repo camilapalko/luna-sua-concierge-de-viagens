@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TripChat } from "@/components/TripChat";
 import { ItineraryView } from "@/components/ItineraryView";
+import { ShareTripPanel } from "@/components/ShareTripPanel";
 import { findLatestItinerary } from "@/lib/itinerary";
 import { getTrip, updateTripStatus, type MessageRow } from "@/lib/trips.functions";
 import { useSession } from "@/hooks/useSession";
@@ -82,7 +83,9 @@ function TripPage() {
       return;
     }
     syncedStatus.current = true;
-    markFinished({ data: { tripId: data.trip.id, status: "finalizada" } })
+    markFinished({
+      data: { tripId: data.trip.id, status: "finalizada", itineraryContent: itinerary.raw },
+    })
       .then(() => queryClient.invalidateQueries({ queryKey: ["trip", tripId] }))
       .catch(() => {
         syncedStatus.current = false;
@@ -146,7 +149,15 @@ function TripPage() {
 
           <TabsContent value="viagem" className="mt-6">
             {itinerary ? (
-              <ItineraryView itinerary={itinerary} />
+              <div className="space-y-4">
+                <div className="flex justify-end">
+                  <ShareTripPanel
+                    trip={data.trip}
+                    onChange={() => queryClient.invalidateQueries({ queryKey: ["trip", tripId] })}
+                  />
+                </div>
+                <ItineraryView itinerary={itinerary} />
+              </div>
             ) : (
               <div className="card-luna p-10 text-center">
                 <p className="font-display text-2xl">Roteiro em construção</p>
