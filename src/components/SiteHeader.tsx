@@ -28,6 +28,11 @@ export function SiteHeader() {
           <Button asChild variant="ghost" size="sm">
             <Link to="/minhas-viagens">Minhas viagens</Link>
           </Button>
+          {user && (
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/perfil">Meu perfil</Link>
+            </Button>
+          )}
           {user ? (
             <Button variant="outline" size="sm" onClick={() => void signOut()}>
               Sair

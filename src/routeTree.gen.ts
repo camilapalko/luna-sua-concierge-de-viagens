@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ChatRouteImport } from './routes/chat'
+import { Route as PerfilRouteImport } from './routes/perfil'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as MinhasViagensIndexRouteImport } from './routes/minhas-viagens/index'
 import { Route as MinhasViagensTripIdRouteImport } from './routes/minhas-viagens/$tripId'
@@ -30,6 +31,11 @@ const AuthRoute = AuthRouteImport.update({
 const ChatRoute = ChatRouteImport.update({
   id: '/chat',
   path: '/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PerfilRoute = PerfilRouteImport.update({
+  id: '/perfil',
+  path: '/perfil',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiChatRoute = ApiChatRouteImport.update({
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/chat': typeof ChatRoute
+  '/perfil': typeof PerfilRoute
   '/api/chat': typeof ApiChatRoute
   '/minhas-viagens/$tripId': typeof MinhasViagensTripIdRoute
   '/roteiro/$token': typeof RoteiroTokenRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/chat': typeof ChatRoute
+  '/perfil': typeof PerfilRoute
   '/api/chat': typeof ApiChatRoute
   '/minhas-viagens/$tripId': typeof MinhasViagensTripIdRoute
   '/roteiro/$token': typeof RoteiroTokenRoute
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/chat': typeof ChatRoute
+  '/perfil': typeof PerfilRoute
   '/api/chat': typeof ApiChatRoute
   '/minhas-viagens/$tripId': typeof MinhasViagensTripIdRoute
   '/roteiro/$token': typeof RoteiroTokenRoute
@@ -87,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/chat'
+    | '/perfil'
     | '/api/chat'
     | '/minhas-viagens/$tripId'
     | '/roteiro/$token'
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/chat'
+    | '/perfil'
     | '/api/chat'
     | '/minhas-viagens/$tripId'
     | '/roteiro/$token'
@@ -105,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/chat'
+    | '/perfil'
     | '/api/chat'
     | '/minhas-viagens/$tripId'
     | '/roteiro/$token'
@@ -115,6 +127,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   ChatRoute: typeof ChatRoute
+  PerfilRoute: typeof PerfilRoute
   ApiChatRoute: typeof ApiChatRoute
   MinhasViagensTripIdRoute: typeof MinhasViagensTripIdRoute
   RoteiroTokenRoute: typeof RoteiroTokenRoute
@@ -142,6 +155,13 @@ declare module '@tanstack/react-router' {
       path: '/chat'
       fullPath: '/chat'
       preLoaderRoute: typeof ChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/perfil': {
+      id: '/perfil'
+      path: '/perfil'
+      fullPath: '/perfil'
+      preLoaderRoute: typeof PerfilRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/chat': {
@@ -179,6 +199,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   ChatRoute: ChatRoute,
+  PerfilRoute: PerfilRoute,
   ApiChatRoute: ApiChatRoute,
   MinhasViagensTripIdRoute: MinhasViagensTripIdRoute,
   RoteiroTokenRoute: RoteiroTokenRoute,

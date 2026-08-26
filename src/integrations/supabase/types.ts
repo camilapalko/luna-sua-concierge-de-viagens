@@ -46,6 +46,30 @@ export type Database = {
           },
         ]
       }
+      traveler_profiles: {
+        Row: {
+          created_at: string
+          defaults: Json
+          miles_programs: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          defaults?: Json
+          miles_programs?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          defaults?: Json
+          miles_programs?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       trips: {
         Row: {
           created_at: string

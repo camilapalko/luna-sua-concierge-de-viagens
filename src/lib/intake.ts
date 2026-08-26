@@ -1,5 +1,7 @@
 export type Answers = Record<string, string | string[]>;
 
+export type MilesProgram = { program: string; notes?: string };
+
 export type IntakeQuestion = {
   id: string;
   prompt: string;
@@ -65,6 +67,15 @@ export const INTAKE_QUESTIONS: IntakeQuestion[] = [
       "Nordeste Brasileiro",
       "Patagônia",
     ],
+  },
+  {
+    id: "destination_specifics",
+    label: "Lugares específicos",
+    prompt:
+      "Já tem cidades ou regiões específicas em mente dentro desse destino, ou prefere que eu monte a rota?",
+    type: "text",
+    placeholder: "Ex: Roma, Florença e Veneza",
+    suggestions: ["Pode montar a rota pra mim", "Já sei quais lugares quero visitar"],
   },
   {
     id: "dates",
@@ -156,11 +167,34 @@ export const INTAKE_QUESTIONS: IntakeQuestion[] = [
   },
   {
     id: "airline_pref",
-    label: "Companhia aérea",
-    prompt: "Tem alguma companhia aérea de preferência?",
+    label: "Preferência de companhia aérea",
+    prompt: "Você tem alguma companhia aérea preferida?",
     type: "single",
-    options: ["LATAM", "GOL", "Azul", "Companhia internacional", "Sem preferência"],
+    options: [
+      "Só quero voar por uma companhia específica",
+      "Tenho preferência, mas topo outra se for mais barata ou tiver horário melhor",
+      "Sem preferência",
+    ],
     skip: isOnlyTours,
+  },
+  {
+    id: "airline_name",
+    label: "Qual companhia",
+    prompt: "Qual companhia?",
+    type: "single",
+    options: ["LATAM", "GOL", "Azul", "Companhia internacional"],
+    skip: (a) => isOnlyTours(a) || a["airline_pref"] === "Sem preferência",
+  },
+  {
+    id: "usar_milhas",
+    label: "Uso de milhas",
+    prompt: "Vi no seu perfil que você tem milhas cadastradas. Quer que eu considere usá-las nessa viagem?",
+    type: "single",
+    options: ["Sim, considere minhas milhas", "Não, prefiro comprar passagem", "Tanto faz"],
+    // "__hasMiles" é preenchido na tela de chat a partir do perfil salvo (ver
+    // chat.tsx) — não é uma pergunta visível, só um sinal pra saber se vale a
+    // pena perguntar isso aqui.
+    skip: (a) => isOnlyTours(a) || a["__hasMiles"] !== "yes",
   },
   {
     id: "connections_pref",
@@ -275,10 +309,21 @@ export function formatAnswer(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value.join(", ") : value;
 }
 
-export function profileSummary(answers: Answers): string {
+export function profileSummary(answers: Answers, milesPrograms: MilesProgram[] = []): string {
   const lines = INTAKE_QUESTIONS.filter((q) => answers[q.id] !== undefined).map(
     (q) => `- ${q.label}: ${formatAnswer(answers[q.id])}`,
   );
+
+  // Só entra no resumo se a pessoa topou usar milhas nessa viagem — evita
+  // mandar pra Luna um dado que ela nem vai usar quando a resposta foi
+  // "prefiro comprar passagem" ou "tanto faz".
+  if (answers["usar_milhas"] === "Sim, considere minhas milhas" && milesPrograms.length > 0) {
+    const milesLine = milesPrograms
+      .map((m) => (m.notes ? `${m.program} (${m.notes})` : m.program))
+      .join(", ");
+    lines.push(`- Milhas disponíveis: ${milesLine}`);
+  }
+
   return [
     "Aqui está o meu perfil de viagem:",
     ...lines,

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Loader2, Check } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { Loader2, Check, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/SiteHeader";
 import { LunaLogo } from "@/components/LunaLogo";
@@ -17,6 +19,7 @@ import {
   type Answers,
 } from "@/lib/intake";
 import { createTrip } from "@/lib/trips.functions";
+import { getMyProfile } from "@/lib/profile.functions";
 import { useSession } from "@/hooks/useSession";
 
 const STORAGE_KEY = "luna:intake-pendente";
@@ -50,8 +53,18 @@ function ChatPage() {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [creating, setCreating] = useState(false);
+  const [usedProfileDefaults, setUsedProfileDefaults] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const submitted = useRef(false);
+  const profileApplied = useRef(false);
+
+  const fetchProfile = useServerFn(getMyProfile);
+  const profileQuery = useQuery({
+    queryKey: ["my-profile", session?.user.id],
+    queryFn: () => fetchProfile(),
+    enabled: Boolean(session),
+    staleTime: 60_000,
+  });
 
   const question = INTAKE_QUESTIONS[index];
   const total = visibleQuestions(answers).length;
@@ -60,6 +73,37 @@ function ChatPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [index]);
+
+  // Pré-preenche com as preferências salvas em "Meu perfil" (companhia
+  // aérea, restrições alimentares, hospedagem, ritmo) numa viagem nova —
+  // assim quem já tem um perfil não precisa responder tudo de novo toda
+  // vez. Só roda uma vez, só se o intake ainda estiver no começo (evita
+  // atropelar quem já está respondendo, ou o fluxo de retomada pós-login,
+  // que tem prioridade e é tratado no efeito de STORAGE_KEY abaixo).
+  useEffect(() => {
+    if (profileApplied.current) return;
+    if (!profileQuery.data) return;
+    if (index !== 0 || Object.keys(answers).length > 0) return;
+    if (window.localStorage.getItem(STORAGE_KEY)) return;
+
+    const { defaults, milesPrograms } = profileQuery.data;
+    const hasDefaults = Object.keys(defaults).length > 0;
+    const hasMiles = milesPrograms.length > 0;
+    if (!hasDefaults && !hasMiles) return;
+
+    profileApplied.current = true;
+    const merged: Answers = { ...defaults, __hasMiles: hasMiles ? "yes" : "no" };
+    setAnswers(merged);
+    setIndex(nextQuestionIndex(merged, 0));
+    setUsedProfileDefaults(true);
+  }, [profileQuery.data, index, answers]);
+
+  function ignoreProfileDefaults() {
+    profileApplied.current = true;
+    setUsedProfileDefaults(false);
+    setAnswers({});
+    setIndex(0);
+  }
 
   const finish = useCallback(
     async (finalAnswers: Answers) => {
@@ -79,7 +123,7 @@ function ChatPage() {
             destination: String(finalAnswers["destination"] ?? "Destino a definir"),
             origin: finalAnswers["origin"] ? String(finalAnswers["origin"]) : null,
             profile: finalAnswers as Record<string, string | string[]>,
-            firstMessage: profileSummary(finalAnswers),
+            firstMessage: profileSummary(finalAnswers, profileQuery.data?.milesPrograms ?? []),
           },
         });
         void navigate({ to: "/minhas-viagens/$tripId", params: { tripId } });
@@ -89,7 +133,7 @@ function ChatPage() {
         toast.error(error instanceof Error ? error.message : "Não consegui criar sua viagem.");
       }
     },
-    [navigate, session],
+    [navigate, session, profileQuery.data],
   );
 
   // Retoma o intake respondido antes do login. Importante: remove a chave do
@@ -127,6 +171,21 @@ function ChatPage() {
     <div className="min-h-screen bg-luna">
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-4 py-10">
+        {usedProfileDefaults && (
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+            <span className="flex items-center gap-2">
+              <Sparkles className="size-4 text-primary" /> Já preenchi algumas respostas com as
+              preferências do seu{" "}
+              <Link to="/perfil" className="underline underline-offset-2">
+                perfil
+              </Link>
+              .
+            </span>
+            <Button variant="ghost" size="sm" className="rounded-xl" onClick={ignoreProfileDefaults}>
+              <X className="mr-1 size-3.5" /> Não usar nesta viagem
+            </Button>
+          </div>
+        )}
         <Progress
           value={total ? Math.min(100, (answeredCount / total) * 100) : 0}
           className="mb-8 h-1.5"
