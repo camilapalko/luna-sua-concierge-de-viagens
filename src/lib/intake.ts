@@ -122,7 +122,7 @@ export const INTAKE_QUESTIONS: IntakeQuestion[] = [
   {
     id: "children_ages",
     label: "Idade das crianças",
-    prompt: "Quantos filhos vão e qual a idade aproximada de cada um?",
+    prompt: "Quantas crianças vão e qual a idade aproximada de cada uma?",
     type: "text",
     placeholder: "Ex: 2 crianças, 5 e 8 anos",
     suggestions: [
