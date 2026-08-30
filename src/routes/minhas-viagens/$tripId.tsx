@@ -142,7 +142,7 @@ function TripPage() {
           </TabsList>
 
           <TabsContent value="chat" className="mt-6 flex-1">
-            <div className="flex h-[calc(100vh-19rem)] min-h-[420px] flex-col">
+            <div className="card-luna flex h-[calc(100vh-19rem)] min-h-[420px] flex-col overflow-hidden">
               <TripChat
                 trip={data.trip}
                 initialMessages={data.messages}
