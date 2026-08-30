@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Check, Sparkles, X } from "lucide-react";
+import { Loader2, Check, Sparkles, X, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/SiteHeader";
 import { LunaLogo } from "@/components/LunaLogo";
@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import {
   INTAKE_QUESTIONS,
   nextQuestionIndex,
+  previousQuestionIndex,
   profileSummary,
   formatAnswer,
   visibleQuestions,
@@ -165,6 +166,26 @@ function ChatPage() {
     if (nextIndex >= INTAKE_QUESTIONS.length) void finish(next);
   }
 
+  // Deixa corrigir uma resposta anterior sem precisar recomeçar o intake
+  // inteiro do zero. Pré-preenche o campo com o que já foi respondido antes
+  // (quando dá pra fazer isso de forma simples) pra ficar fácil só confirmar
+  // de novo ou ajustar.
+  function goBack() {
+    if (index <= 0) return;
+    const prevIndex = previousQuestionIndex(answers, index - 1);
+    const prevQuestion = INTAKE_QUESTIONS[prevIndex];
+    setTextValue("");
+    setMulti([]);
+    setStart("");
+    setEnd("");
+    if (prevQuestion) {
+      const existing = answers[prevQuestion.id];
+      if (prevQuestion.type === "text" && typeof existing === "string") setTextValue(existing);
+      if (prevQuestion.type === "multi" && Array.isArray(existing)) setMulti(existing);
+    }
+    setIndex(prevIndex);
+  }
+
   const done = index >= INTAKE_QUESTIONS.length;
 
   return (
@@ -207,6 +228,17 @@ function ChatPage() {
 
           {question && !done && (
             <div className="space-y-4">
+              {index > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="-ml-2 text-muted-foreground"
+                  onClick={goBack}
+                >
+                  <ArrowLeft className="mr-1 size-3.5" /> Voltar
+                </Button>
+              )}
               <LunaBubble text={question.prompt} />
 
               {question.type === "single" && (

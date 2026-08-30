@@ -304,6 +304,18 @@ export function nextQuestionIndex(answers: Answers, from: number): number {
   return INTAKE_QUESTIONS.length;
 }
 
+// Espelha nextQuestionIndex, mas andando pra trás — usado pelo botão
+// "Voltar" do intake pra achar a pergunta visível anterior (pulando as que
+// estão escondidas pelas respostas atuais), em vez de simplesmente decrementar
+// o índice em 1 (que poderia cair numa pergunta que não deveria aparecer).
+export function previousQuestionIndex(answers: Answers, from: number): number {
+  for (let i = Math.min(from, INTAKE_QUESTIONS.length - 1); i >= 0; i--) {
+    const q = INTAKE_QUESTIONS[i]!;
+    if (!q.skip?.(answers)) return i;
+  }
+  return 0;
+}
+
 export function formatAnswer(value: string | string[] | undefined): string {
   if (!value) return "—";
   return Array.isArray(value) ? value.join(", ") : value;

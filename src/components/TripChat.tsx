@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
-import { Send, Sparkles, AlertCircle } from "lucide-react";
+import { Send, Sparkles, AlertCircle, RotateCcw, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,7 +13,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { updateTripStatus, type MessageRow, type TripRow } from "@/lib/trips.functions";
 import { cn } from "@/lib/utils";
 
-type ChatMessage = Pick<MessageRow, "role" | "content"> & { id?: string; error?: boolean };
+type ChatMessage = Pick<MessageRow, "role" | "content"> & {
+  id?: string;
+  error?: boolean;
+  retryOf?: string;
+};
+
+// Depois de quanto tempo "pensando" mostramos um aviso extra de paciência.
+// Respostas normais chegam bem antes disso; isso só aparece quando a Luna
+// está numa rodada de continuação automática (resposta grande, cortada pelo
+// limite de tokens do modelo) ou a API está mais lenta que o normal.
+const SLOW_RESPONSE_HINT_MS = 8000;
 
 export function TripChat({
   trip,
@@ -27,6 +37,7 @@ export function TripChat({
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showSlowHint, setShowSlowHint] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const started = useRef(false);
@@ -41,10 +52,32 @@ export function TripChat({
     onMessagesChange?.(messages);
   }, [messages, onMessagesChange]);
 
+  useEffect(() => {
+    if (!busy) {
+      setShowSlowHint(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowSlowHint(true), SLOW_RESPONSE_HINT_MS);
+    return () => clearTimeout(timer);
+  }, [busy]);
+
+  // Índice da PRIMEIRA mensagem com o roteiro completo. É essa que merece o
+  // "reveal" grande (ItineraryView cheio) — qualquer roteiro completo que
+  // apareça DEPOIS dela é uma reemissão por causa de uma edição pós-
+  // finalização (ver REGRA CRÍTICA #3 do prompt), e mostrar o card gigante
+  // de novo a cada pequeno ajuste ("troca só o hotel do Dia 3") é barulho
+  // demais. Essas reemissões viram uma confirmação compacta em vez disso —
+  // a aba "Viagem" já é atualizada por trás, então nada de informação se
+  // perde, só o chat fica mais limpo.
+  const firstItineraryIndex = useMemo(
+    () => messages.findIndex((m) => m.role === "assistant" && isItineraryMessage(m.content)),
+    [messages],
+  );
+
   const send = useCallback(
-    async (message?: string) => {
+    async (message?: string, options?: { skipPush?: boolean }) => {
       setBusy(true);
-      if (message) {
+      if (message && !options?.skipPush) {
         setMessages((prev) => [...prev, { role: "user", content: message }]);
       }
       try {
@@ -104,15 +137,25 @@ export function TripChat({
         const text = error instanceof Error ? error.message : "Erro ao falar com a Luna.";
         toast.error(text);
         // Além do toast (que pode passar despercebido), deixa um aviso visível
-        // dentro da própria conversa, pra ficar claro que algo falhou — em vez
-        // de a conversa simplesmente "não avançar" sem explicação nenhuma.
-        setMessages((prev) => [...prev, { role: "assistant", content: text, error: true }]);
+        // dentro da própria conversa, com a opção de tentar de novo sem
+        // precisar redigitar a mensagem original.
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: text, error: true, ...(message ? { retryOf: message } : {}) },
+        ]);
       } finally {
         setBusy(false);
         inputRef.current?.focus();
       }
     },
-    [trip.id, trip.status, markFinished, queryClient],
+    [trip.id, markFinished, queryClient],
+  );
+
+  const retry = useCallback(
+    (message: string) => {
+      void send(message, { skipPush: true });
+    },
+    [send],
   );
 
   useEffect(() => {
@@ -137,14 +180,24 @@ export function TripChat({
             role={message.role}
             content={message.content}
             error={message.error}
+            retryOf={message.retryOf}
+            onRetry={retry}
+            isFirstItinerary={index === firstItineraryIndex}
           />
         ))}
         {busy && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <LunaLogo size={28} />
-            <span className="flex gap-1">
-              <Dot /> <Dot delay="150ms" /> <Dot delay="300ms" />
-            </span>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <LunaLogo size={28} />
+              <span className="flex gap-1">
+                <Dot /> <Dot delay="150ms" /> <Dot delay="300ms" />
+              </span>
+            </div>
+            {showSlowHint && (
+              <p className="ml-9 text-xs text-muted-foreground/80">
+                Roteiros grandes podem levar um pouco mais — já estou nisso.
+              </p>
+            )}
           </div>
         )}
         <div ref={bottomRef} />
@@ -200,12 +253,31 @@ export function Bubble({
   role,
   content,
   error,
+  retryOf,
+  onRetry,
+  isFirstItinerary = true,
 }: {
   role: "user" | "assistant";
   content: string;
   error?: boolean | undefined;
+  retryOf?: string | undefined;
+  onRetry?: (message: string) => void;
+  isFirstItinerary?: boolean;
 }) {
   if (role === "assistant" && isItineraryMessage(content)) {
+    if (!isFirstItinerary) {
+      return (
+        <div className="flex gap-3">
+          <span className="mt-1 inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <CheckCircle2 className="size-4" />
+          </span>
+          <div className="max-w-[85%] rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+            Roteiro atualizado com essa mudança — já está refletido na aba{" "}
+            <span className="font-semibold">Viagem</span>.
+          </div>
+        </div>
+      );
+    }
     return <ItineraryView itinerary={parseItinerary(content)} />;
   }
 
@@ -215,8 +287,19 @@ export function Bubble({
         <span className="mt-1 inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
           <AlertCircle className="size-4" />
         </span>
-        <div className="max-w-[85%] rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          {content}
+        <div className="max-w-[85%] space-y-2 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          <p>{content}</p>
+          {retryOf && onRetry && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-xl border-destructive/40 text-destructive hover:bg-destructive/10"
+              onClick={() => onRetry(retryOf)}
+            >
+              <RotateCcw className="mr-1.5 size-3.5" /> Tentar novamente
+            </Button>
+          )}
         </div>
       </div>
     );

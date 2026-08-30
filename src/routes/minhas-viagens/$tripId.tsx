@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TripChat } from "@/components/TripChat";
 import { ItineraryView } from "@/components/ItineraryView";
 import { ShareTripPanel } from "@/components/ShareTripPanel";
+import { TripProfileDialog } from "@/components/TripProfileDialog";
 import { findLatestItinerary } from "@/lib/itinerary";
 import { getTrip, updateTripStatus, type MessageRow } from "@/lib/trips.functions";
 import { useSession } from "@/hooks/useSession";
@@ -122,9 +123,12 @@ function TripPage() {
             </Button>
             <h1 className="font-display text-3xl font-semibold">{data.trip.destination}</h1>
           </div>
-          <Badge variant={data.trip.status === "finalizada" ? "default" : "secondary"}>
-            {data.trip.status === "finalizada" ? "Finalizada" : "Planejando"}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <TripProfileDialog profile={data.trip.profile} />
+            <Badge variant={data.trip.status === "finalizada" ? "default" : "secondary"}>
+              {data.trip.status === "finalizada" ? "Finalizada" : "Planejando"}
+            </Badge>
+          </div>
         </div>
 
         <Tabs defaultValue="chat" className="flex flex-1 flex-col">
