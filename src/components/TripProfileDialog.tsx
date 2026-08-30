@@ -24,7 +24,7 @@ export function TripProfileDialog({ profile }: { profile: Answers }) {
           <ListChecks className="mr-1.5 size-4" /> Ver perfil
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[80vh] overflow-y-auto">
+      <DialogContent className="thin-scrollbar max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Perfil desta viagem</DialogTitle>
           <DialogDescription>O que você respondeu no intake, pra consulta rápida.</DialogDescription>

@@ -173,7 +173,7 @@ export function TripChat({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex-1 space-y-5 overflow-y-auto px-1 pb-6">
+      <div className="thin-scrollbar flex-1 space-y-5 overflow-y-auto px-1 pb-6">
         {messages.map((message, index) => (
           <Bubble
             key={message.id ?? index}

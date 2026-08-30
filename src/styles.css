@@ -155,3 +155,23 @@
     display: none;
   }
 }
+
+/* Áreas com scroll vertical próprio (ex.: lista de mensagens do chat) usam
+   isso pra ter uma barra fina e discreta, no estilo do app, em vez de cair
+   no estilo "clássico" do sistema operacional (largo, com setinhas), que em
+   alguns Windows com configuração de acessibilidade/exibição específica
+   aparece como uma barra branca larga colada no conteúdo. */
+@utility thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--color-border);
+    border-radius: 9999px;
+  }
+}
