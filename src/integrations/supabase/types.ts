@@ -46,6 +46,36 @@ export type Database = {
           },
         ]
       }
+      place_photos: {
+        Row: {
+          created_at: string
+          google_place_id: string | null
+          id: string
+          lat: number | null
+          lng: number | null
+          photo_url: string | null
+          query: string
+        }
+        Insert: {
+          created_at?: string
+          google_place_id?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          photo_url?: string | null
+          query: string
+        }
+        Update: {
+          created_at?: string
+          google_place_id?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          photo_url?: string | null
+          query?: string
+        }
+        Relationships: []
+      }
       traveler_profiles: {
         Row: {
           created_at: string
