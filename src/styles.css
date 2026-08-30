@@ -143,3 +143,15 @@
   box-shadow: var(--shadow-card);
   border: 1px solid var(--color-border);
 }
+
+/* Some carrosséis (ex.: seção "Veja o que você vai receber") usam scroll
+   horizontal com snap no mobile. Escondemos a barra de rolagem visual em
+   todos os navegadores — o gesto de arrastar continua funcionando normal,
+   só a barrinha cinza que some. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

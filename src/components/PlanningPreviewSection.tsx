@@ -98,8 +98,13 @@ export function PlanningPreviewSection() {
         Veja o que você vai receber no seu planejamento
       </h2>
 
-      <div className="mt-10 grid items-stretch gap-6 md:grid-cols-3">
-        <div className="flex h-full flex-col">
+      {/* No celular isso vira um carrossel horizontal com snap (arraste pros
+          lados) em vez de empilhar as 3 colunas na vertical — cada coluna
+          já tem 3 itens dentro, então empilhado ficava um bloco muito
+          comprido/estreito. A partir de md volta a ser a grade normal de
+          3 colunas lado a lado. */}
+      <div className="no-scrollbar mt-10 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 md:grid md:snap-none md:grid-cols-3 md:gap-6 md:overflow-visible md:pb-0">
+        <div className="flex h-full w-[85%] shrink-0 snap-center flex-col md:w-auto md:shrink md:snap-align-none">
           <ColumnHeading
             icon={COLUMNS[0]!.icon}
             title={COLUMNS[0]!.title}
@@ -119,7 +124,7 @@ export function PlanningPreviewSection() {
           </div>
         </div>
 
-        <div className="flex h-full flex-col">
+        <div className="flex h-full w-[85%] shrink-0 snap-center flex-col md:w-auto md:shrink md:snap-align-none">
           <ColumnHeading
             icon={COLUMNS[1]!.icon}
             title={COLUMNS[1]!.title}
@@ -141,7 +146,7 @@ export function PlanningPreviewSection() {
           </div>
         </div>
 
-        <div className="flex h-full flex-col">
+        <div className="flex h-full w-[85%] shrink-0 snap-center flex-col md:w-auto md:shrink md:snap-align-none">
           <ColumnHeading
             icon={COLUMNS[2]!.icon}
             title={COLUMNS[2]!.title}
