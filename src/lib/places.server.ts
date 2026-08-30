@@ -65,13 +65,20 @@ async function fetchFromGoogle(query: string, apiKey: string): Promise<PlaceLook
     .upload(path, bytes, { contentType, upsert: true });
   if (uploadError) return null;
 
-  const { data: publicUrlData } = supabaseAdmin.storage.from("place-photos").getPublicUrl(path);
+  // Buckets públicos estão bloqueados neste projeto, então geramos uma URL
+  // assinada de longa duração (10 anos) — ela continua sendo servida pelo
+  // nosso próprio storage, sem expor nenhuma chave do Google.
+  const { data: signed, error: signedError } = await supabaseAdmin.storage
+    .from("place-photos")
+    .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+  if (signedError || !signed?.signedUrl) return null;
 
   return {
-    photoUrl: publicUrlData.publicUrl,
+    photoUrl: signed.signedUrl,
     placeId: place.id,
     lat: place.location?.latitude ?? null,
     lng: place.location?.longitude ?? null,
+  };
   };
 }
 
