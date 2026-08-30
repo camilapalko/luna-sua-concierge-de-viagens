@@ -79,7 +79,6 @@ async function fetchFromGoogle(query: string, apiKey: string): Promise<PlaceLook
     lat: place.location?.latitude ?? null,
     lng: place.location?.longitude ?? null,
   };
-  };
 }
 
 async function resolveOne(rawQuery: string): Promise<string> {
