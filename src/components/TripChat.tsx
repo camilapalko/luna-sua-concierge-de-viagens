@@ -173,7 +173,7 @@ export function TripChat({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="no-scrollbar flex-1 space-y-5 overflow-y-auto px-1 pb-6">
+      <div className="no-scrollbar flex-1 space-y-5 overflow-y-auto px-4 pt-5 pb-6 sm:px-6">
         {messages.map((message, index) => (
           <Bubble
             key={message.id ?? index}
@@ -203,7 +203,7 @@ export function TripChat({
         <div ref={bottomRef} />
       </div>
 
-      <div className="border-t border-border/70 bg-background/80 px-1 pt-4">
+      <div className="border-t border-border/70 bg-background/80 px-4 pb-4 pt-4 sm:px-6">
         <form
           className="flex items-end gap-2"
           onSubmit={(event) => {
