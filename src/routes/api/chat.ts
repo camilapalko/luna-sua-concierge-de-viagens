@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { LUNA_SYSTEM_PROMPT, buildContextPrompt } from "@/lib/luna-prompt";
+import { isItineraryMessage } from "@/lib/itinerary";
+import { resolvePlacePhotos } from "@/lib/places.server";
 import type { Database } from "@/integrations/supabase/types";
 
 type Body = { tripId?: string; message?: string };
@@ -203,6 +205,10 @@ export const Route = createFileRoute("/api/chat")({
             { error: `A Luna não conseguiu responder agora. (finish_reason: ${finishReason})` },
             500,
           );
+        }
+
+        if (isItineraryMessage(full)) {
+          full = await resolvePlacePhotos(full);
         }
 
         await supabase
