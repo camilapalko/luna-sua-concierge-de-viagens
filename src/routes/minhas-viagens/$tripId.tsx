@@ -160,7 +160,7 @@ function TripPage() {
                     onChange={() => queryClient.invalidateQueries({ queryKey: ["trip", tripId] })}
                   />
                 </div>
-                <ItineraryView itinerary={itinerary} />
+                <ItineraryView itinerary={itinerary} destination={data.trip.destination} />
               </div>
             ) : (
               <div className="card-luna p-10 text-center">

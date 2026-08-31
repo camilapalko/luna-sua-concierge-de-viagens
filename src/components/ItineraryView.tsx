@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Plane,
   UtensilsCrossed,
@@ -20,7 +20,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { extractLinks, type Itinerary, type ItineraryActivity } from "@/lib/itinerary";
+import { TripMap } from "@/components/TripMap";
+import {
+  extractImageNames,
+  extractLinks,
+  type Itinerary,
+  type ItineraryActivity,
+} from "@/lib/itinerary";
 
 const ICONS: Record<ItineraryActivity["kind"], typeof Plane> = {
   voo: Plane,
@@ -87,7 +93,17 @@ function LinkCards({ body, empty }: { body: string; empty: string }) {
   );
 }
 
-export function ItineraryView({ itinerary }: { itinerary: Itinerary }) {
+export function ItineraryView({
+  itinerary,
+  destination,
+}: {
+  itinerary: Itinerary;
+  destination?: string;
+}) {
+  const placeNames = useMemo(
+    () => [...extractImageNames(itinerary.hospedagem), ...extractImageNames(itinerary.restaurantes)],
+    [itinerary],
+  );
   return (
     <div className="space-y-6">
       <header className="rounded-2xl bg-gradient-to-br from-primary/10 via-secondary/40 to-accent/30 p-6">
@@ -97,6 +113,10 @@ export function ItineraryView({ itinerary }: { itinerary: Itinerary }) {
           Tudo organizado: documentos, dia a dia, restaurantes, reservas e checklist.
         </p>
       </header>
+
+      {destination && <TripMap destination={destination} placeNames={placeNames} />}
+
+
 
       <Accordion type="multiple" defaultValue={["docs"]} className="card-luna px-5">
         <AccordionItem value="docs" className="border-none">
