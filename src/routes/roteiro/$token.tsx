@@ -64,7 +64,10 @@ function SharedItineraryPage() {
                 {data.title || data.destination}
               </h1>
             </div>
-            <ItineraryView itinerary={parseItinerary(data.itineraryContent)} />
+            <ItineraryView
+              itinerary={parseItinerary(data.itineraryContent)}
+              destination={data.destination}
+            />
           </div>
         )}
       </main>

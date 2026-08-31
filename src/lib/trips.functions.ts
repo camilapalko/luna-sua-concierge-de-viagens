@@ -125,3 +125,19 @@ export const deleteTrip = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+export const getPlaceCoordinates = createServerFn({ method: "POST" })
+  .inputValidator((input: { names: string[] }) => input)
+  .handler(async ({ data }): Promise<Array<{ name: string; lat: number; lng: number }>> => {
+    if (!data.names.length) return [];
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const normalized = data.names.map((n) => n.trim().replace(/\s+/g, " ").toLowerCase());
+    const { data: rows, error } = await supabaseAdmin
+      .from("place_photos")
+      .select("query, lat, lng")
+      .in("query", normalized);
+    if (error || !rows) return [];
+    return rows
+      .filter((r) => r.lat != null && r.lng != null)
+      .map((r) => ({ name: r.query, lat: r.lat as number, lng: r.lng as number }));
+  });

@@ -164,3 +164,17 @@ export function extractLinks(body: string): Array<{ label: string; url: string }
   }
   return links;
 }
+
+// Extrai os nomes (texto alt) de cada imagem markdown ![nome](url) de um
+// trecho — usado pra saber quais lugares (hotéis/restaurantes) têm foto
+// resolvida, e assim buscar as coordenadas deles pra desenhar o mapa.
+export function extractImageNames(body: string): string[] {
+  const names: string[] = [];
+  const regex = /!\[([^\]]+)\]\([^)]+\)/g;
+  let match = regex.exec(body);
+  while (match) {
+    names.push(match[1]!);
+    match = regex.exec(body);
+  }
+  return names;
+}
