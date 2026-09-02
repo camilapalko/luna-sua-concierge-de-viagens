@@ -140,3 +140,63 @@ export async function resolvePlacePhotos(content: string): Promise<string> {
     return `![${trimmed}](${url})`;
   });
 }
+
+const LOCAL_MARKER = /\{\{LOCAL:\s*([^}]+)\}\}/g;
+
+// Resolve marcadores {{LOCAL: Nome, Cidade}} usados nos passeios do roteiro
+// dia a dia — só guarda coordenadas no cache (sem baixar foto, mais barato),
+// pra alimentar o seletor de dia do mapa da viagem. NÃO reescreve o
+// conteúdo: o marcador continua no texto salvo, e é removido só na hora de
+// exibir (parseDays em itinerary.ts) — assim sempre dá pra re-derivar quais
+// lugares aparecem em cada dia.
+export async function resolvePlaceLocations(content: string): Promise<void> {
+  const apiKey = process.env["GOOGLE_MAPS_API_KEY"];
+  if (!apiKey) return;
+
+  const matches = Array.from(content.matchAll(LOCAL_MARKER));
+  if (matches.length === 0) return;
+
+  const uniqueQueries = Array.from(new Set(matches.map((m) => m[1]!.trim())));
+  await Promise.all(
+    uniqueQueries.map(async (rawQuery) => {
+      const query = rawQuery.trim();
+      const cacheKey = normalizeQuery(query);
+      const { data: cached } = await supabaseAdmin
+        .from("place_photos")
+        .select("query")
+        .eq("query", cacheKey)
+        .maybeSingle();
+      if (cached) return;
+
+      try {
+        const searchRes = await fetch("https://places.googleapis.com/v1/places:searchText", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": apiKey,
+            "X-Goog-FieldMask": "places.id,places.location",
+          },
+          body: JSON.stringify({ textQuery: query, maxResultCount: 1 }),
+        });
+        if (!searchRes.ok) return;
+        const searchData = (await searchRes.json()) as {
+          places?: Array<{ id?: string; location?: { latitude?: number; longitude?: number } }>;
+        };
+        const place = searchData.places?.[0];
+        if (!place?.id || !place.location) return;
+
+        await supabaseAdmin.from("place_photos").upsert(
+          {
+            query: cacheKey,
+            google_place_id: place.id,
+            lat: place.location.latitude ?? null,
+            lng: place.location.longitude ?? null,
+          },
+          { onConflict: "query" },
+        );
+      } catch {
+        // silencioso: esse lugar só não aparece no mapa, sem quebrar nada
+      }
+    }),
+  );
+}
