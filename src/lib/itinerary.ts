@@ -3,6 +3,7 @@ export const ITINERARY_MARKER = "# 🌟 SEU ROTEIRO COMPLETO";
 export type ItineraryActivity = {
   kind: "voo" | "refeicao" | "passeio" | "transporte" | "hospedagem" | "outro";
   text: string;
+  place?: string;
 };
 
 export type ItineraryDay = {
@@ -72,6 +73,8 @@ function activityKind(line: string): ItineraryActivity["kind"] {
   return "outro";
 }
 
+const LOCAL_MARKER = /\{\{LOCAL:\s*([^}]+)\}\}/;
+
 function parseDays(body: string): ItineraryDay[] {
   const chunks = body.split(/^###\s+/m).slice(1);
   return chunks.map((chunk) => {
@@ -83,11 +86,14 @@ function parseDays(body: string): ItineraryDay[] {
       .map((line) => line.trim())
       .filter((line) => line.startsWith("-") || line.startsWith("*"))
       .map((line) => {
+        const localMatch = LOCAL_MARKER.exec(line);
+        const place = localMatch?.[1]?.trim();
         const text = line
           .replace(/^[-*]\s*/, "")
           .replace(/\[(voo|refei[cç][aã]o|passeio|transporte|hospedagem)\]\s*/i, "")
+          .replace(LOCAL_MARKER, "")
           .trim();
-        return { kind: activityKind(line), text };
+        return { kind: activityKind(line), text, ...(place ? { place } : {}) };
       })
       .filter((a) => a.text.length > 0);
     return { title, activities };
