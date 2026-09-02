@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { LUNA_SYSTEM_PROMPT, buildContextPrompt } from "@/lib/luna-prompt";
 import { isItineraryMessage } from "@/lib/itinerary";
-import { resolvePlacePhotos } from "@/lib/places.server";
+import { resolvePlacePhotos, resolvePlaceLocations } from "@/lib/places.server";
 import type { Database } from "@/integrations/supabase/types";
 
 type Body = { tripId?: string; message?: string };
@@ -209,6 +209,7 @@ export const Route = createFileRoute("/api/chat")({
 
         if (isItineraryMessage(full)) {
           full = await resolvePlacePhotos(full);
+          await resolvePlaceLocations(full);
         }
 
         await supabase
