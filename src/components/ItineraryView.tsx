@@ -100,8 +100,19 @@ export function ItineraryView({
   itinerary: Itinerary;
   destination?: string;
 }) {
-  const placeNames = useMemo(
+  const overviewNames = useMemo(
     () => [...extractImageNames(itinerary.hospedagem), ...extractImageNames(itinerary.restaurantes)],
+    [itinerary],
+  );
+  const dayMapEntries = useMemo(
+    () =>
+      itinerary.dias.map((day, index) => {
+        const match = /^Dia\s*\d+/i.exec(day.title);
+        return {
+          label: match ? match[0] : `Dia ${index + 1}`,
+          placeNames: day.activities.map((a) => a.place).filter((p): p is string => Boolean(p)),
+        };
+      }),
     [itinerary],
   );
   return (
@@ -114,7 +125,9 @@ export function ItineraryView({
         </p>
       </header>
 
-      {destination && <TripMap destination={destination} placeNames={placeNames} />}
+      {destination && (
+        <TripMap destination={destination} overviewNames={overviewNames} days={dayMapEntries} />
+      )}
 
 
 

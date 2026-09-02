@@ -1,31 +1,42 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Map } from "lucide-react";
 import { getPlaceCoordinates } from "@/lib/trips.functions";
+import { Button } from "@/components/ui/button";
 
 const EMBED_KEY = import.meta.env["VITE_GOOGLE_MAPS_EMBED_KEY"] as string | undefined;
 
+export type TripMapDay = { label: string; placeNames: string[] };
+
 // Mapa real do roteiro usando a Maps Embed API do Google (gratuita e sem
-// limite de uso). Se tivermos 2+ lugares com coordenadas resolvidas (via
-// cache de fotos), desenha uma rota ligando eles; com 1, centraliza nele;
-// sem nenhum, cai num mapa simples centrado no destino da viagem (sempre
-// funciona, mesmo sem nenhuma foto resolvida ainda). Sem a chave configurada,
-// não renderiza nada.
+// limite de uso). Um seletor (Geral / Dia 1 / Dia 2 / ...) troca quais
+// lugares aparecem NO MESMO mapa — "Geral" usa hotéis/restaurantes com foto
+// resolvida, cada dia usa os passeios daquele dia. Com 2+ lugares resolvidos
+// desenha uma rota ligando eles; com 1, centraliza nele; sem nenhum, cai num
+// mapa simples centrado no destino da viagem. Sem a chave configurada, não
+// renderiza nada.
 export function TripMap({
   destination,
-  placeNames,
+  overviewNames,
+  days,
 }: {
   destination: string;
-  placeNames: string[];
+  overviewNames: string[];
+  days: TripMapDay[];
 }) {
-  const fetchCoords = useServerFn(getPlaceCoordinates);
-  const uniqueNames = useMemo(() => Array.from(new Set(placeNames)), [placeNames]);
+  const [selected, setSelected] = useState<number>(-1);
 
+  const activeNames = useMemo(() => {
+    const names = selected === -1 ? overviewNames : (days[selected]?.placeNames ?? []);
+    return Array.from(new Set(names));
+  }, [selected, overviewNames, days]);
+
+  const fetchCoords = useServerFn(getPlaceCoordinates);
   const { data } = useQuery({
-    queryKey: ["place-coordinates", uniqueNames],
-    queryFn: () => fetchCoords({ data: { names: uniqueNames } }),
-    enabled: Boolean(EMBED_KEY) && uniqueNames.length > 0,
+    queryKey: ["place-coordinates", activeNames],
+    queryFn: () => fetchCoords({ data: { names: activeNames } }),
+    enabled: Boolean(EMBED_KEY) && activeNames.length > 0,
   });
 
   if (!EMBED_KEY) return null;
@@ -57,9 +68,36 @@ export function TripMap({
 
   return (
     <section className="card-luna overflow-hidden p-0">
-      <div className="flex items-center gap-2 p-6 pb-4">
-        <Map className="size-4 text-primary" />
-        <h3 className="font-display text-xl font-semibold">Mapa da viagem</h3>
+      <div className="flex flex-wrap items-center justify-between gap-3 p-6 pb-4">
+        <div className="flex items-center gap-2">
+          <Map className="size-4 text-primary" />
+          <h3 className="font-display text-xl font-semibold">Mapa da viagem</h3>
+        </div>
+        {days.length > 0 && (
+          <div className="no-scrollbar flex max-w-full gap-1.5 overflow-x-auto">
+            <Button
+              type="button"
+              size="sm"
+              variant={selected === -1 ? "default" : "outline"}
+              className="shrink-0 rounded-full"
+              onClick={() => setSelected(-1)}
+            >
+              Geral
+            </Button>
+            {days.map((day, index) => (
+              <Button
+                key={day.label + index}
+                type="button"
+                size="sm"
+                variant={selected === index ? "default" : "outline"}
+                className="shrink-0 rounded-full"
+                onClick={() => setSelected(index)}
+              >
+                {day.label}
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
       <iframe
         title="Mapa da viagem"
