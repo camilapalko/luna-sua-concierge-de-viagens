@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { LUNA_SYSTEM_PROMPT, buildContextPrompt } from "@/lib/luna-prompt";
-import { isItineraryMessage } from "@/lib/itinerary";
+import { isItineraryMessage, ITINERARY_MARKER } from "@/lib/itinerary";
 import { resolvePlacePhotos, resolvePlaceLocations } from "@/lib/places.server";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -207,10 +207,56 @@ export const Route = createFileRoute("/api/chat")({
           );
         }
 
+        // Rede de segurança: às vezes a Gemini ignora o formato oficial e fecha
+        // a viagem com um resumo em texto livre. Sem o cabeçalho
+        // "# 🌟 SEU ROTEIRO COMPLETO" a viagem fica presa em "Planejando" pra
+        // sempre e fotos/mapa nunca são gerados. Quando a resposta claramente
+        // PARECE um roteiro final mas não está no formato, pedimos silenciosamente
+        // pra Gemini reescrever a MESMA informação no formato correto. O usuário
+        // nunca vê a versão malformada — mesmo espírito das continuações por
+        // corte de token acima.
+        function looksLikeItineraryAttempt(text: string): boolean {
+          const dayMatches = text.match(/(^|\n)\s*(#{1,4}\s*)?(\*\*)?\s*Dia\s+\d+/gi) ?? [];
+          if (dayMatches.length >= 2) return true;
+          const moneyCount = (text.match(/R\$\s?\d/g) ?? []).length;
+          const mentionsTrip = /roteiro|viagem|itiner[áa]rio/i.test(text);
+          if (mentionsTrip && moneyCount >= 3) return true;
+          const hasClosingWords =
+            /roteiro (completo|final|pronto)|tudo pronto|resumo (da|final)|plano (final|da viagem)|ficha (final|da viagem)/i.test(
+              text,
+            );
+          if (hasClosingWords && text.length > 1500) return true;
+          return false;
+        }
+
+        if (!isItineraryMessage(full) && looksLikeItineraryAttempt(full)) {
+          const REFORMAT_INSTRUCTION = `Sua resposta anterior fechou a viagem FORA do formato oficial do app. Reescreva EXATAMENTE a mesma informação (sem inventar nada novo, sem remover nada relevante, sem fazer nenhuma pergunta e sem nenhum comentário antes ou depois) estritamente no formato oficial do roteiro completo: a primeira linha deve ser exatamente "${ITINERARY_MARKER}", seguida das seções de nível 2 exigidas, na ordem, com "### Dia N – ..." e os marcadores [voo]/[refeição]/[passeio]/[transporte] e {{LOCAL: ...}} em cada [passeio]. Responda somente com o roteiro reformatado.`;
+
+          try {
+            const fixRes = await callGeminiWithRetry([
+              ...conversation,
+              { role: "assistant", content: full },
+              { role: "user", content: REFORMAT_INSTRUCTION },
+            ]);
+            if (fixRes.ok) {
+              const fixData = (await fixRes.json()) as {
+                choices?: Array<{ message?: { content?: string } }>;
+              };
+              const fixed = fixData.choices?.[0]?.message?.content ?? "";
+              if (fixed.trim() && isItineraryMessage(fixed)) {
+                full = fixed;
+              }
+            }
+          } catch {
+            // Falha silenciosa: melhor salvar o texto original do que travar a conversa.
+          }
+        }
+
         if (isItineraryMessage(full)) {
           full = await resolvePlacePhotos(full);
           await resolvePlaceLocations(full);
         }
+
 
         await supabase
           .from("messages")
