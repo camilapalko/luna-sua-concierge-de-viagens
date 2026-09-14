@@ -223,7 +223,7 @@ export function ItineraryView({
             <TabsTrigger value="essencial">Essencial</TabsTrigger>
           </TabsList>
           <TabsContent value="transporte" className="pt-5">
-            <LinkCards body={itinerary.linksVoos} empty="Sem links de transporte." />
+            <LinkCards body={itinerary.linksTransporte} empty="Sem links de transporte." />
           </TabsContent>
           <TabsContent value="hospedagem" className="pt-5">
             <LinkCards body={itinerary.linksHospedagem} empty="Sem links de hospedagem." />
