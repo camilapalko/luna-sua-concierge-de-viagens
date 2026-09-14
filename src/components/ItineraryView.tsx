@@ -9,6 +9,7 @@ import {
   FileText,
   ExternalLink,
   Lightbulb,
+  Luggage,
 } from "lucide-react";
 import { Markdown } from "@/components/Markdown";
 import {
