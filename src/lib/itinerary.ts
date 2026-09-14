@@ -151,10 +151,12 @@ export function parseItinerary(content: string): Itinerary {
     restaurantes: pick(sections, ["restaurante"]),
     links: pick(sections, ["links"]),
     linksVoos: pick(linkGroups, ["voo"]),
+    linksTransporte: pickAll(linkGroups, ["voo", "onibus", "carro"]),
     linksHospedagem: pick(linkGroups, ["hosped"]),
     linksPasseios: pick(linkGroups, ["passeio"]),
     checklist: parseChecklist(pick(sections, ["checklist"])),
     essencial: pick(sections, ["essencial"]),
+    recomendacoes: pick(sections, ["recomenda"]),
     dicas: pick(sections, ["dicas"]),
   };
 }
