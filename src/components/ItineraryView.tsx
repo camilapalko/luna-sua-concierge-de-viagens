@@ -201,6 +201,17 @@ export function ItineraryView({
         </section>
       )}
 
+      {itinerary.recomendacoes && (
+        <section className="card-luna p-6">
+          <h3 className="flex items-center gap-2 font-display text-xl font-semibold">
+            <Luggage className="size-4 text-primary" /> Recomendações
+          </h3>
+          <div className="mt-4">
+            <Markdown content={itinerary.recomendacoes} />
+          </div>
+        </section>
+      )}
+
       <section className="card-luna p-6">
         <Tabs defaultValue="transporte">
           <TabsList className="flex h-auto flex-wrap justify-start gap-1 bg-muted/60">
