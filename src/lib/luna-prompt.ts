@@ -59,6 +59,7 @@ E conter estas seções, nesta ordem, com títulos de nível 2:
 ## 🔗 Links para Reservas
 ## ✅ Checklist Personalizado
 ## 🧭 Essencial
+## 🎒 Recomendações
 ## 💡 Dicas Finais
 
 Regras do roteiro final: seja objetiva — no máximo 3 opções por categoria, no máximo 3 atividades por dia, no máximo 15 itens no checklist.
