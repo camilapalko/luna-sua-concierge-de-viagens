@@ -111,7 +111,7 @@ export function ItineraryView({
         const match = /^Dia\s*\d+/i.exec(day.title);
         return {
           label: match ? match[0] : `Dia ${index + 1}`,
-          placeNames: day.activities.map((a) => a.place).filter((p): p is string => Boolean(p)),
+          placeNames: day.activities.flatMap((a) => a.places),
         };
       }),
     [itinerary],

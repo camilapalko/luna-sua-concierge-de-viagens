@@ -230,7 +230,14 @@ export const Route = createFileRoute("/api/chat")({
         }
 
         if (!isItineraryMessage(full) && looksLikeItineraryAttempt(full)) {
-          const REFORMAT_INSTRUCTION = `Sua resposta anterior fechou a viagem FORA do formato oficial do app. Reescreva EXATAMENTE a mesma informação (sem inventar nada novo, sem remover nada relevante, sem fazer nenhuma pergunta e sem nenhum comentário antes ou depois) estritamente no formato oficial do roteiro completo: a primeira linha deve ser exatamente "${ITINERARY_MARKER}", seguida das seções de nível 2 exigidas, na ordem, com "### Dia N – ..." e os marcadores [voo]/[refeição]/[passeio]/[transporte] e {{LOCAL: ...}} em cada [passeio]. Responda somente com o roteiro reformatado.`;
+          const REFORMAT_INSTRUCTION = `Sua resposta anterior fechou a viagem FORA do formato oficial do app. Reescreva tudo estritamente no formato oficial do roteiro completo, sem fazer nenhuma pergunta e sem nenhum comentário antes ou depois. A primeira linha deve ser exatamente "${ITINERARY_MARKER}", seguida das seções de nível 2 exigidas, na ordem, com "### Dia N – ..." e os marcadores [voo]/[refeição]/[passeio]/[transporte].
+
+REGRAS:
+1. Fatos concretos já decididos sobre ESSA viagem (cidades e rota, hospedagem sugerida, atividades do dia a dia já escritas, restaurantes, datas e valores) devem ser mantidos exatamente como estão — não invente, não troque e não remova nenhum desses fatos.
+2. MAS as seções estruturais obrigatórias do formato (Documentação e Requisitos, Essencial, Recomendações, Links para Reservas, Dicas Finais) SEMPRE precisam ser preenchidas com conteúdo real, seguindo as regras de conteúdo de cada seção definidas no seu prompt do sistema — mesmo que a resposta anterior não tenha mencionado nada disso. Ou seja: documentação = passaporte/visto/vacinas + aviso de confirmar na fonte oficial; essencial = seguro viagem, câmbio, voltagem, idioma, fuso, telefone de emergência; recomendações = mala, costumes locais, segurança específica do destino; links = os links de busca genéricos padrão para os meios de transporte, hospedagem e passeios aplicáveis. Deixar qualquer uma dessas seções vazia, com "sem informações" ou com texto genérico é um erro de formatação tão grave quanto inventar fatos novos da viagem.
+3. Cada atividade [passeio] deve ter NO MÁXIMO UM marcador {{LOCAL: Nome, Cidade}} por linha, sempre no final da linha, referente ao lugar principal daquela atividade — nunca vários marcadores {{LOCAL: ...}} dentro da mesma frase, e nunca no meio do texto.
+
+Responda somente com o roteiro reformatado.`;
 
           try {
             const fixRes = await callGeminiWithRetry([
