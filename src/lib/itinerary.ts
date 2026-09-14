@@ -19,10 +19,12 @@ export type Itinerary = {
   restaurantes: string;
   links: string;
   linksVoos: string;
+  linksTransporte: string;
   linksHospedagem: string;
   linksPasseios: string;
   checklist: string[];
   essencial: string;
+  recomendacoes: string;
   dicas: string;
 };
 
@@ -61,6 +63,15 @@ function pick(sections: Record<string, string>, keywords: string[]): string {
   const key = Object.keys(sections).find((k) => keywords.some((word) => k.includes(word)));
   return key ? (sections[key] ?? "") : "";
 }
+
+function pickAll(sections: Record<string, string>, keywords: string[]): string {
+  return Object.keys(sections)
+    .filter((k) => keywords.some((word) => k.includes(word)))
+    .map((k) => sections[k] ?? "")
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 
 function activityKind(line: string): ItineraryActivity["kind"] {
   const match = /\[(voo|refei[cç][aã]o|passeio|transporte|hospedagem)\]/i.exec(line);
@@ -140,10 +151,12 @@ export function parseItinerary(content: string): Itinerary {
     restaurantes: pick(sections, ["restaurante"]),
     links: pick(sections, ["links"]),
     linksVoos: pick(linkGroups, ["voo"]),
+    linksTransporte: pickAll(linkGroups, ["voo", "onibus", "carro"]),
     linksHospedagem: pick(linkGroups, ["hosped"]),
     linksPasseios: pick(linkGroups, ["passeio"]),
     checklist: parseChecklist(pick(sections, ["checklist"])),
     essencial: pick(sections, ["essencial"]),
+    recomendacoes: pick(sections, ["recomenda"]),
     dicas: pick(sections, ["dicas"]),
   };
 }

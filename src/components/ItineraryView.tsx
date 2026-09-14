@@ -9,6 +9,7 @@ import {
   FileText,
   ExternalLink,
   Lightbulb,
+  Luggage,
 } from "lucide-react";
 import { Markdown } from "@/components/Markdown";
 import {
@@ -200,6 +201,17 @@ export function ItineraryView({
         </section>
       )}
 
+      {itinerary.recomendacoes && (
+        <section className="card-luna p-6">
+          <h3 className="flex items-center gap-2 font-display text-xl font-semibold">
+            <Luggage className="size-4 text-primary" /> Recomendações
+          </h3>
+          <div className="mt-4">
+            <Markdown content={itinerary.recomendacoes} />
+          </div>
+        </section>
+      )}
+
       <section className="card-luna p-6">
         <Tabs defaultValue="transporte">
           <TabsList className="flex h-auto flex-wrap justify-start gap-1 bg-muted/60">
@@ -211,7 +223,7 @@ export function ItineraryView({
             <TabsTrigger value="essencial">Essencial</TabsTrigger>
           </TabsList>
           <TabsContent value="transporte" className="pt-5">
-            <LinkCards body={itinerary.linksVoos} empty="Sem links de transporte." />
+            <LinkCards body={itinerary.linksTransporte} empty="Sem links de transporte." />
           </TabsContent>
           <TabsContent value="hospedagem" className="pt-5">
             <LinkCards body={itinerary.linksHospedagem} empty="Sem links de hospedagem." />
