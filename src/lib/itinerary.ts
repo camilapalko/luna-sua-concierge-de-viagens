@@ -19,10 +19,12 @@ export type Itinerary = {
   restaurantes: string;
   links: string;
   linksVoos: string;
+  linksTransporte: string;
   linksHospedagem: string;
   linksPasseios: string;
   checklist: string[];
   essencial: string;
+  recomendacoes: string;
   dicas: string;
 };
 
