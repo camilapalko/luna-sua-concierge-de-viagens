@@ -64,6 +64,15 @@ function pick(sections: Record<string, string>, keywords: string[]): string {
   return key ? (sections[key] ?? "") : "";
 }
 
+function pickAll(sections: Record<string, string>, keywords: string[]): string {
+  return Object.keys(sections)
+    .filter((k) => keywords.some((word) => k.includes(word)))
+    .map((k) => sections[k] ?? "")
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+
 function activityKind(line: string): ItineraryActivity["kind"] {
   const match = /\[(voo|refei[cç][aã]o|passeio|transporte|hospedagem)\]/i.exec(line);
   const value = normalize(match?.[1] ?? "");
