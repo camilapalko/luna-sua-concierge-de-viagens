@@ -84,7 +84,6 @@ function activityKind(line: string): ItineraryActivity["kind"] {
   return "outro";
 }
 
-const LOCAL_MARKER_ALL = /\{\{LOCAL:\s*([^}]+)\}\}/g;
 
 function parseDays(body: string): ItineraryDay[] {
   const chunks = body.split(/^###\s+/m).slice(1);
@@ -97,13 +96,21 @@ function parseDays(body: string): ItineraryDay[] {
       .map((line) => line.trim())
       .filter((line) => line.startsWith("-") || line.startsWith("*"))
       .map((line) => {
-        const places = Array.from(line.matchAll(LOCAL_MARKER_ALL))
+        const places = Array.from(line.matchAll(/\{\{\s*LOCAL\s*:\s*([^}]*?)\s*\}\}/gi))
           .map((m) => m[1]?.trim() ?? "")
           .filter(Boolean);
+        // Cada marcador vira o NOME do lugar no texto exibido (antes eles eram
+        // apagados, o que deixava buracos do tipo "caminhada pelo ."). Usamos
+        // uma regex nova a cada linha porque regex global guarda lastIndex e,
+        // reutilizada entre matchAll/replace, pulava ocorrências — era isso que
+        // deixava o segundo {{LOCAL: ...}} da mesma linha visível como texto cru.
         const text = line
           .replace(/^[-*]\s*/, "")
           .replace(/\[(voo|refei[cç][aã]o|passeio|transporte|hospedagem)\]\s*/i, "")
-          .replace(LOCAL_MARKER_ALL, "")
+          .replace(/\{\{\s*LOCAL\s*:\s*([^}]*?)\s*\}\}/gi, (_m, name: string) =>
+            (name.split(",")[0] ?? "").trim(),
+          )
+          .replace(/\s+([.,;:!?])/g, "$1")
           .replace(/\s{2,}/g, " ")
           .trim();
         return { kind: activityKind(line), text, places };
