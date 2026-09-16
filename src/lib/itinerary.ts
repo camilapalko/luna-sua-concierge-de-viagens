@@ -180,13 +180,25 @@ export function hasRequiredItinerarySections(content: string): boolean {
   const sections = splitSections(content);
   const has = (keywords: string[]) =>
     Object.keys(sections).some((k) => keywords.some((word) => k.includes(word)));
+  const keyFor = (keywords: string[]): string | null =>
+    Object.keys(sections).find((k) => keywords.some((word) => k.includes(word))) ?? null;
   if (!has(["documentacao", "requisitos"])) return false;
-  if (!has(["essencial"])) return false;
-  if (!has(["recomenda"])) return false;
   if (!has(["links"])) return false;
   const diasBody = pick(sections, ["roteiro dia", "dia a dia"]);
   if (!diasBody) return false;
   if (parseDays(diasBody).length < 1) return false;
+  // "Essencial", "Recomendações" e "Dicas Finais" precisam ser TRÊS seções
+  // de verdade, cada uma com seu próprio título — a IA às vezes junta as
+  // três num título só (ex.: "## Essencial, Recomendações e Dicas Finais"),
+  // e nesse caso as três buscas por palavra-chave acabam apontando pra essa
+  // MESMA seção fundida, fazendo o app mostrar o mesmo texto nas três abas.
+  // Exigir que as três chaves existam E sejam diferentes entre si pega esse
+  // caso e aciona o safety-net de reformatação automaticamente.
+  const essencialKey = keyFor(["essencial"]);
+  const recomendaKey = keyFor(["recomenda"]);
+  const dicasKey = keyFor(["dicas"]);
+  if (!essencialKey || !recomendaKey || !dicasKey) return false;
+  if (new Set([essencialKey, recomendaKey, dicasKey]).size < 3) return false;
   return true;
 }
 
