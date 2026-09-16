@@ -84,7 +84,6 @@ function activityKind(line: string): ItineraryActivity["kind"] {
   return "outro";
 }
 
-const LOCAL_MARKER_ALL = /\{\{LOCAL:\s*([^}]+)\}\}/g;
 
 function parseDays(body: string): ItineraryDay[] {
   const chunks = body.split(/^###\s+/m).slice(1);
