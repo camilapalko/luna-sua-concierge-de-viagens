@@ -97,7 +97,7 @@ function parseDays(body: string): ItineraryDay[] {
       .map((line) => line.trim())
       .filter((line) => line.startsWith("-") || line.startsWith("*"))
       .map((line) => {
-        const places = Array.from(line.matchAll(LOCAL_MARKER_ALL))
+        const places = Array.from(line.matchAll(/\{\{\s*LOCAL\s*:\s*([^}]*?)\s*\}\}/gi))
           .map((m) => m[1]?.trim() ?? "")
           .filter(Boolean);
         // Cada marcador vira o NOME do lugar no texto exibido (antes eles eram
