@@ -243,7 +243,19 @@ export const Route = createFileRoute("/api/chat")({
           : looksLikeItineraryAttempt(full);
 
         if (needsReformat) {
-          const REFORMAT_INSTRUCTION = `Sua resposta anterior fechou a viagem FORA do formato oficial do app. Reescreva tudo estritamente no formato oficial do roteiro completo, sem fazer nenhuma pergunta e sem nenhum comentário antes ou depois. A primeira linha deve ser exatamente "${ITINERARY_MARKER}", seguida das seções de nível 2 exigidas, na ordem, com "### Dia N – ..." e os marcadores [voo]/[refeição]/[passeio]/[transporte].
+          const REFORMAT_INSTRUCTION = `Sua resposta anterior fechou a viagem FORA do formato oficial do app. Reescreva tudo estritamente no formato oficial do roteiro completo, sem fazer nenhuma pergunta e sem nenhum comentário antes ou depois. A primeira linha deve ser exatamente "${ITINERARY_MARKER}", seguida das seções de nível 2 exigidas, com "### Dia N – ..." e os marcadores [voo]/[refeição]/[passeio]/[transporte].
+
+IMPORTANTE — ANCORAGEM: mesmo que suas respostas anteriores nesta mesma conversa tenham usado títulos diferentes (ex.: "Roteiro Detalhado", "Resumo da Viagem", "Links Úteis", "Recomendações Importantes", tabelas de custo, ou qualquer outra estrutura própria), IGNORE esses títulos anteriores — eles estavam errados. Use exatamente os 9 títulos listados abaixo, com essas palavras e emojis exatos, nesta ordem exata, mesmo que isso signifique usar um título diferente do que você mesma usou antes nesta conversa:
+
+## 📄 Documentação e Requisitos
+## 🏨 Hospedagem Sugerida
+## 🗓️ Roteiro Dia a Dia
+## 🍽️ Lista de Restaurantes
+## 🔗 Links para Reservas
+## ✅ Checklist Personalizado
+## 🧭 Essencial
+## 🎒 Recomendações
+## 💡 Dicas Finais
 
 REGRAS:
 1. Fatos concretos já decididos sobre ESSA viagem (cidades e rota, hospedagem sugerida, atividades do dia a dia já escritas, restaurantes, datas e valores) devem ser mantidos exatamente como estão — não invente, não troque e não remova nenhum desses fatos.
