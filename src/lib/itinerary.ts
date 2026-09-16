@@ -100,10 +100,18 @@ function parseDays(body: string): ItineraryDay[] {
         const places = Array.from(line.matchAll(LOCAL_MARKER_ALL))
           .map((m) => m[1]?.trim() ?? "")
           .filter(Boolean);
+        // Cada marcador vira o NOME do lugar no texto exibido (antes eles eram
+        // apagados, o que deixava buracos do tipo "caminhada pelo ."). Usamos
+        // uma regex nova a cada linha porque regex global guarda lastIndex e,
+        // reutilizada entre matchAll/replace, pulava ocorrências — era isso que
+        // deixava o segundo {{LOCAL: ...}} da mesma linha visível como texto cru.
         const text = line
           .replace(/^[-*]\s*/, "")
           .replace(/\[(voo|refei[cç][aã]o|passeio|transporte|hospedagem)\]\s*/i, "")
-          .replace(LOCAL_MARKER_ALL, "")
+          .replace(/\{\{\s*LOCAL\s*:\s*([^}]*?)\s*\}\}/gi, (_m, name: string) =>
+            (name.split(",")[0] ?? "").trim(),
+          )
+          .replace(/\s+([.,;:!?])/g, "$1")
           .replace(/\s{2,}/g, " ")
           .trim();
         return { kind: activityKind(line), text, places };
