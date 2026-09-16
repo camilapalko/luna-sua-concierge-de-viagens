@@ -1,7 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { LUNA_SYSTEM_PROMPT, buildContextPrompt } from "@/lib/luna-prompt";
-import { isItineraryMessage, ITINERARY_MARKER } from "@/lib/itinerary";
+import {
+  isItineraryMessage,
+  ITINERARY_MARKER,
+  hasRequiredItinerarySections,
+} from "@/lib/itinerary";
 import { resolvePlacePhotos, resolvePlaceLocations } from "@/lib/places.server";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -229,7 +233,16 @@ export const Route = createFileRoute("/api/chat")({
           return false;
         }
 
-        if (!isItineraryMessage(full) && looksLikeItineraryAttempt(full)) {
+        // O safety-net dispara em DOIS casos: (1) o marcador está ausente mas
+        // o texto parece tentativa de fechamento, OU (2) o marcador está
+        // presente mas a estrutura de seções está incompleta/inventada —
+        // nesses casos a viagem passaria como "finalizada" sem documentação,
+        // links, checklist etc.
+        const needsReformat = isItineraryMessage(full)
+          ? !hasRequiredItinerarySections(full)
+          : looksLikeItineraryAttempt(full);
+
+        if (needsReformat) {
           const REFORMAT_INSTRUCTION = `Sua resposta anterior fechou a viagem FORA do formato oficial do app. Reescreva tudo estritamente no formato oficial do roteiro completo, sem fazer nenhuma pergunta e sem nenhum comentário antes ou depois. A primeira linha deve ser exatamente "${ITINERARY_MARKER}", seguida das seções de nível 2 exigidas, na ordem, com "### Dia N – ..." e os marcadores [voo]/[refeição]/[passeio]/[transporte].
 
 REGRAS:
@@ -250,7 +263,15 @@ Responda somente com o roteiro reformatado.`;
                 choices?: Array<{ message?: { content?: string } }>;
               };
               const fixed = fixData.choices?.[0]?.message?.content ?? "";
-              if (fixed.trim() && isItineraryMessage(fixed)) {
+              // Só aceita o texto reformatado se ele passou nas duas validações:
+              // marcador presente E estrutura de seções completa. Caso
+              // contrário, mantém o `full` original (mesma lógica de falha
+              // silenciosa: melhor salvar o que tem do que travar).
+              if (
+                fixed.trim() &&
+                isItineraryMessage(fixed) &&
+                hasRequiredItinerarySections(fixed)
+              ) {
                 full = fixed;
               }
             }
