@@ -1,7 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { LUNA_SYSTEM_PROMPT, buildContextPrompt } from "@/lib/luna-prompt";
-import { isItineraryMessage, ITINERARY_MARKER } from "@/lib/itinerary";
+import {
+  isItineraryMessage,
+  ITINERARY_MARKER,
+  hasRequiredItinerarySections,
+} from "@/lib/itinerary";
 import { resolvePlacePhotos, resolvePlaceLocations } from "@/lib/places.server";
 import type { Database } from "@/integrations/supabase/types";
 

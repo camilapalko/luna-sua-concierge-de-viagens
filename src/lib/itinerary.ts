@@ -163,6 +163,26 @@ export function parseItinerary(content: string): Itinerary {
   };
 }
 
+// O marcador "# 🌟 SEU ROTEIRO COMPLETO" sozinho não garante roteiro pronto:
+// a IA às vezes usa o cabeçalho certo mas inventa uma estrutura de seções
+// diferente (ex.: "## 📅 Roteiro Detalhado" em vez de "Roteiro Dia a Dia") e
+// omite seções obrigatórias. Esta função reusa os MESMOS critérios de busca
+// por palavra-chave do parseItinerary para conferir que as seções exigidas
+// existem de verdade — e que "Roteiro Dia a Dia" tem pelo menos um "### Dia N".
+export function hasRequiredItinerarySections(content: string): boolean {
+  const sections = splitSections(content);
+  const has = (keywords: string[]) =>
+    Object.keys(sections).some((k) => keywords.some((word) => k.includes(word)));
+  if (!has(["documentacao", "requisitos"])) return false;
+  if (!has(["essencial"])) return false;
+  if (!has(["recomenda"])) return false;
+  if (!has(["links"])) return false;
+  const diasBody = pick(sections, ["roteiro dia", "dia a dia"]);
+  if (!diasBody) return false;
+  if (parseDays(diasBody).length < 1) return false;
+  return true;
+}
+
 export function findLatestItinerary(
   messages: Array<{ role: string; content: string }>,
 ): Itinerary | null {
