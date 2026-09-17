@@ -1,413 +1,334 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Check, Sparkles, X, ArrowLeft } from "lucide-react";
-import { toast } from "sonner";
-import { SiteHeader } from "@/components/SiteHeader";
-import { LunaLogo } from "@/components/LunaLogo";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
+import { createFileRoute } from "@tanstack/react-router";
+import { createClient } from "@supabase/supabase-js";
+import { LUNA_SYSTEM_PROMPT, buildContextPrompt } from "@/lib/luna-prompt";
 import {
-  INTAKE_QUESTIONS,
-  nextQuestionIndex,
-  previousQuestionIndex,
-  profileSummary,
-  formatAnswer,
-  visibleQuestions,
-  toggleMultiOption,
-  type Answers,
-} from "@/lib/intake";
-import { createTrip } from "@/lib/trips.functions";
-import { getMyProfile } from "@/lib/profile.functions";
-import { useSession } from "@/hooks/useSession";
+  isItineraryMessage,
+  ITINERARY_MARKER,
+  hasRequiredItinerarySections,
+} from "@/lib/itinerary";
+import { resolvePlacePhotos, resolvePlaceLocations } from "@/lib/places.server";
+import type { Database } from "@/integrations/supabase/types";
 
-const STORAGE_KEY = "luna:intake-pendente";
+type Body = { tripId?: string; message?: string };
 
-export const Route = createFileRoute("/chat")({
-  head: () => ({
-    meta: [
-      { title: "Planejar viagem com a Luna" },
-      {
-        name: "description",
-        content:
-          "Responda algumas perguntas e a Luna monta um roteiro personalizado para a sua próxima viagem.",
-      },
-      { property: "og:title", content: "Planejar viagem com a Luna" },
-      {
-        property: "og:description",
-        content: "Conte seus desejos de viagem e receba um roteiro sob medida.",
-      },
-    ],
-  }),
-  component: ChatPage,
-});
+const MODEL = "gemini-3.6-flash";
 
-function ChatPage() {
-  const navigate = useNavigate();
-  const { session, loading } = useSession();
-  const [answers, setAnswers] = useState<Answers>({});
-  const [index, setIndex] = useState(0);
-  const [textValue, setTextValue] = useState("");
-  const [multi, setMulti] = useState<string[]>([]);
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [usedProfileDefaults, setUsedProfileDefaults] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const submitted = useRef(false);
-  const profileApplied = useRef(false);
-
-  const fetchProfile = useServerFn(getMyProfile);
-  const profileQuery = useQuery({
-    queryKey: ["my-profile", session?.user.id],
-    queryFn: () => fetchProfile(),
-    enabled: Boolean(session),
-    staleTime: 60_000,
+function json(body: unknown, status: number) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
   });
+}
 
-  const question = INTAKE_QUESTIONS[index];
-  const total = visibleQuestions(answers).length;
-  const answeredCount = Object.keys(answers).length;
+export const Route = createFileRoute("/api/chat")({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        const authHeader = request.headers.get("authorization") ?? "";
+        const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+        if (!token) return json({ error: "Faça login para conversar com a Luna." }, 401);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [index]);
+        const supabaseUrl = process.env["SUPABASE_URL"];
+        const supabaseKey = process.env["SUPABASE_PUBLISHABLE_KEY"];
+        const aiKey = process.env["GEMINI_API_KEY"];
+        if (!supabaseUrl || !supabaseKey) return json({ error: "Backend indisponível." }, 500);
+        if (!aiKey) return json({ error: "Serviço de IA indisponível." }, 500);
 
-  // Pré-preenche com as preferências salvas em "Meu perfil" (companhia
-  // aérea, restrições alimentares, hospedagem, ritmo) numa viagem nova —
-  // assim quem já tem um perfil não precisa responder tudo de novo toda
-  // vez. Só roda uma vez, só se o intake ainda estiver no começo (evita
-  // atropelar quem já está respondendo, ou o fluxo de retomada pós-login,
-  // que tem prioridade e é tratado no efeito de STORAGE_KEY abaixo).
-  useEffect(() => {
-    if (profileApplied.current) return;
-    if (!profileQuery.data) return;
-    if (index !== 0 || Object.keys(answers).length > 0) return;
-    if (window.localStorage.getItem(STORAGE_KEY)) return;
-
-    const { defaults, milesPrograms } = profileQuery.data;
-    const hasDefaults = Object.keys(defaults).length > 0;
-    const hasMiles = milesPrograms.length > 0;
-    if (!hasDefaults && !hasMiles) return;
-
-    profileApplied.current = true;
-    const merged: Answers = { ...defaults, __hasMiles: hasMiles ? "yes" : "no" };
-    setAnswers(merged);
-    setIndex(nextQuestionIndex(merged, 0));
-    setUsedProfileDefaults(true);
-  }, [profileQuery.data, index, answers]);
-
-  function ignoreProfileDefaults() {
-    profileApplied.current = true;
-    setUsedProfileDefaults(false);
-    setAnswers({});
-    setIndex(0);
-  }
-
-  const finish = useCallback(
-    async (finalAnswers: Answers) => {
-      if (submitted.current) return;
-      submitted.current = true;
-
-      if (!session) {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(finalAnswers));
-        void navigate({ to: "/auth", search: { redirect: "/chat" } });
-        return;
-      }
-
-      setCreating(true);
-      try {
-        const { tripId } = await createTrip({
-          data: {
-            destination: String(finalAnswers["destination"] ?? "Destino a definir"),
-            origin: finalAnswers["origin"] ? String(finalAnswers["origin"]) : null,
-            profile: finalAnswers as Record<string, string | string[]>,
-            firstMessage: profileSummary(finalAnswers, profileQuery.data?.milesPrograms ?? []),
+        const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
+          global: {
+            fetch: (input, init) => {
+              const headers = new Headers(init?.headers);
+              headers.delete("Authorization");
+              headers.set("apikey", supabaseKey);
+              headers.set("Authorization", `Bearer ${token}`);
+              return fetch(input, { ...init, headers });
+            },
           },
+          auth: { persistSession: false, autoRefreshToken: false, storage: undefined },
         });
-        void navigate({ to: "/minhas-viagens/$tripId", params: { tripId } });
-      } catch (error) {
-        submitted.current = false;
-        setCreating(false);
-        toast.error(error instanceof Error ? error.message : "Não consegui criar sua viagem.");
-      }
+
+        const { data: claims } = await supabase.auth.getClaims(token);
+        if (!claims?.claims?.sub) return json({ error: "Sessão inválida." }, 401);
+
+        const body = (await request.json()) as Body;
+        if (!body.tripId) return json({ error: "Viagem não informada." }, 400);
+
+        const { data: trip, error: tripError } = await supabase
+          .from("trips")
+          .select("id, destination, origin, profile")
+          .eq("id", body.tripId)
+          .maybeSingle();
+        if (tripError || !trip) return json({ error: "Viagem não encontrada." }, 404);
+
+        if (body.message?.trim()) {
+          const { error } = await supabase
+            .from("messages")
+            .insert({ trip_id: trip.id, role: "user", content: body.message.trim() });
+          if (error) return json({ error: error.message }, 500);
+        }
+
+        const { data: history, error: historyError } = await supabase
+          .from("messages")
+          .select("role, content")
+          .eq("trip_id", trip.id)
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true });
+        if (historyError) return json({ error: historyError.message }, 500);
+
+        const messages = [
+          { role: "system", content: LUNA_SYSTEM_PROMPT },
+          {
+            role: "system",
+            content: buildContextPrompt((trip.profile ?? {}) as unknown as Record<string, unknown>),
+          },
+          ...(history ?? []).map((m) => ({ role: m.role, content: m.content })),
+        ];
+
+        // Importante: chamamos a Gemini SEM streaming (stream: false) e
+        // esperamos a resposta completa antes de fazer qualquer outra coisa.
+        // Isso é proposital: em ambientes serverless/edge (como o Cloudflare
+        // Workers, usado aqui), não há garantia de que um "trabalho em
+        // segundo plano" (uma promise não aguardada) continue rodando depois
+        // que a conexão original termina ou o cliente se desconecta. Ao
+        // esperar a resposta inteira e SÓ DEPOIS gravar no banco e responder
+        // ao cliente, garantimos que a mensagem nunca é perdida, não importa
+        // o que aconteça com a conexão do usuário.
+        //
+        // 65.536 tokens de saída é o teto FIXO do modelo gemini-3.6-flash —
+        // não dá pra configurar um valor maior. Para roteiros muito longos
+        // (ex: 15 dias, 6 pessoas) essa resposta pode cortar no meio. Quando
+        // isso acontece (finish_reason indicando corte por limite de
+        // tokens), fazemos automaticamente uma ou mais chamadas extras
+        // pedindo pra Gemini continuar exatamente de onde parou, e juntamos
+        // tudo antes de salvar/responder — o usuário nunca vê o corte.
+        type AiMessage = { role: string; content: string };
+
+        async function callGemini(conversation: AiMessage[]) {
+          return fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${aiKey}`,
+            },
+            body: JSON.stringify({
+              model: MODEL,
+              messages: conversation,
+              stream: false,
+              max_tokens: 65536,
+              reasoning_effort: "low",
+            }),
+          });
+        }
+
+        // A API da Gemini às vezes falha de forma transitória (5xx, sobrecarga
+        // momentânea) mesmo com tudo certo do nosso lado. Antes, qualquer
+        // falha assim já desistia na hora e mostrava um erro genérico sem
+        // nenhuma pista do que aconteceu. Agora: (1) tentamos de novo uma vez
+        // após uma pequena espera se for um erro 5xx, e (2) se ainda assim
+        // falhar, incluímos o status HTTP e um trecho da resposta da Gemini
+        // na mensagem de erro, para dar pra diagnosticar de verdade da
+        // próxima vez, em vez de adivinhar.
+        async function callGeminiWithRetry(conversation: AiMessage[]) {
+          const first = await callGemini(conversation);
+          if (first.status < 500) return first;
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          return callGemini(conversation);
+        }
+
+        const MAX_CONTINUATIONS = 3;
+        const CONTINUE_INSTRUCTION =
+          "Continue a resposta anterior EXATAMENTE de onde ela parou. Não repita nada do que já foi escrito, não reinicie o texto nem adicione saudações — apenas continue a partir da última palavra ou frase incompleta.";
+
+        let conversation: AiMessage[] = [...messages];
+        let full = "";
+        let finishReason = "desconhecido";
+        const totalUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+        let round = 0;
+
+        while (round <= MAX_CONTINUATIONS) {
+          const aiRes = await callGeminiWithRetry(conversation);
+
+          if (aiRes.status === 429) {
+            if (full.trim()) break;
+            return json({ error: "Muitas mensagens em pouco tempo. Aguarde um instante." }, 429);
+          }
+          if (aiRes.status === 401 || aiRes.status === 403) {
+            if (full.trim()) break;
+            return json(
+              { error: "Chave da IA inválida ou sem permissão. Verifique a GEMINI_API_KEY." },
+              500,
+            );
+          }
+          if (!aiRes.ok) {
+            if (full.trim()) break;
+            const bodyText = await aiRes.text().catch(() => "");
+            const snippet = bodyText.slice(0, 300);
+            return json(
+              {
+                error: `A Luna não conseguiu responder agora. (HTTP ${aiRes.status}${snippet ? `: ${snippet}` : ""})`,
+              },
+              500,
+            );
+          }
+
+          const data = (await aiRes.json()) as {
+            choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
+            usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+          };
+          const choice = data.choices?.[0];
+          const chunk = choice?.message?.content ?? "";
+          finishReason = choice?.finish_reason ?? "desconhecido";
+
+          if (data.usage) {
+            totalUsage.prompt_tokens += data.usage.prompt_tokens ?? 0;
+            totalUsage.completion_tokens += data.usage.completion_tokens ?? 0;
+            totalUsage.total_tokens += data.usage.total_tokens ?? 0;
+          }
+
+          full += chunk;
+
+          const normalizedReason = finishReason.toLowerCase().replace(/_/g, "");
+          const isLengthCut = normalizedReason === "length" || normalizedReason === "maxtokens";
+
+          if (!isLengthCut || round === MAX_CONTINUATIONS) break;
+
+          // Próxima rodada: acrescenta o que já foi gerado como resposta do
+          // assistente e pede pra continuar. Essas mensagens intermediárias
+          // NÃO são salvas no banco — só o texto final concatenado vira uma
+          // única mensagem no histórico da viagem.
+          conversation = [
+            ...conversation,
+            { role: "assistant", content: chunk },
+            { role: "user", content: CONTINUE_INSTRUCTION },
+          ];
+          round += 1;
+        }
+
+        if (!full.trim()) {
+          return json(
+            { error: `A Luna não conseguiu responder agora. (finish_reason: ${finishReason})` },
+            500,
+          );
+        }
+
+        // Rede de segurança: às vezes a Gemini ignora o formato oficial e fecha
+        // a viagem com um resumo em texto livre. Sem o cabeçalho
+        // "# 🌟 SEU ROTEIRO COMPLETO" a viagem fica presa em "Planejando" pra
+        // sempre e fotos/mapa nunca são gerados. Quando a resposta claramente
+        // PARECE um roteiro final mas não está no formato, pedimos silenciosamente
+        // pra Gemini reescrever a MESMA informação no formato correto. O usuário
+        // nunca vê a versão malformada — mesmo espírito das continuações por
+        // corte de token acima.
+        function looksLikeItineraryAttempt(text: string): boolean {
+          const dayMatches = text.match(/(^|\n)\s*(#{1,4}\s*)?(\*\*)?\s*Dia\s+\d+/gi) ?? [];
+          if (dayMatches.length >= 2) return true;
+          const moneyCount = (text.match(/R\$\s?\d/g) ?? []).length;
+          const mentionsTrip = /roteiro|viagem|itiner[áa]rio/i.test(text);
+          if (mentionsTrip && moneyCount >= 3) return true;
+          const hasClosingWords =
+            /roteiro (completo|final|pronto)|tudo pronto|resumo (da|final)|plano (final|da viagem)|ficha (final|da viagem)/i.test(
+              text,
+            );
+          if (hasClosingWords && text.length > 1500) return true;
+          return false;
+        }
+
+        // O safety-net dispara em DOIS casos: (1) o marcador está ausente mas
+        // o texto parece tentativa de fechamento, OU (2) o marcador está
+        // presente mas a estrutura de seções está incompleta/inventada —
+        // nesses casos a viagem passaria como "finalizada" sem documentação,
+        // links, checklist etc.
+        const needsReformat = isItineraryMessage(full)
+          ? !hasRequiredItinerarySections(full)
+          : looksLikeItineraryAttempt(full);
+
+        if (needsReformat) {
+          const REFORMAT_INSTRUCTION = `Sua resposta anterior fechou a viagem FORA do formato oficial do app. Reescreva tudo estritamente no formato oficial do roteiro completo, sem fazer nenhuma pergunta e sem nenhum comentário antes ou depois. A primeira linha deve ser exatamente "${ITINERARY_MARKER}", seguida das seções de nível 2 exigidas, com "### Dia N – ..." e os marcadores [voo]/[refeição]/[passeio]/[transporte].
+
+IMPORTANTE — ANCORAGEM: mesmo que suas respostas anteriores nesta mesma conversa tenham usado títulos diferentes (ex.: "Roteiro Detalhado", "Resumo da Viagem", "Links Úteis", "Recomendações Importantes", tabelas de custo, ou qualquer outra estrutura própria), IGNORE esses títulos anteriores — eles estavam errados. Use exatamente os 9 títulos listados abaixo, com essas palavras e emojis exatos, nesta ordem exata, mesmo que isso signifique usar um título diferente do que você mesma usou antes nesta conversa:
+
+## 📄 Documentação e Requisitos
+## 🏨 Hospedagem Sugerida
+## 🗓️ Roteiro Dia a Dia
+## 🍽️ Lista de Restaurantes
+## 🔗 Links para Reservas
+## ✅ Checklist Personalizado
+## 🧭 Essencial
+## 🎒 Recomendações
+## 💡 Dicas Finais
+
+REGRAS:
+1. Fatos concretos já decididos sobre ESSA viagem (cidades e rota, hospedagem sugerida, atividades do dia a dia já escritas, restaurantes, datas e valores) devem ser mantidos exatamente como estão — não invente, não troque e não remova nenhum desses fatos.
+2. MAS as seções estruturais obrigatórias do formato (Documentação e Requisitos, Essencial, Recomendações, Links para Reservas, Dicas Finais) SEMPRE precisam ser preenchidas com conteúdo real, seguindo as regras de conteúdo de cada seção definidas no seu prompt do sistema — mesmo que a resposta anterior não tenha mencionado nada disso. Ou seja: documentação = passaporte/visto/vacinas + aviso de confirmar na fonte oficial; essencial = seguro viagem, câmbio, voltagem, idioma, fuso, telefone de emergência; recomendações = mala, costumes locais, segurança específica do destino; links = os links de busca genéricos padrão para os meios de transporte, hospedagem e passeios aplicáveis. Deixar qualquer uma dessas seções vazia, com "sem informações" ou com texto genérico é um erro de formatação tão grave quanto inventar fatos novos da viagem.
+3. Cada atividade [passeio] deve ter NO MÁXIMO UM marcador {{LOCAL: Nome, Cidade}} por linha, sempre no final da linha, referente ao lugar principal daquela atividade — nunca vários marcadores {{LOCAL: ...}} dentro da mesma frase, e nunca no meio do texto.
+4. "Essencial", "Recomendações" e "Dicas Finais" são TRÊS seções separadas, cada uma com seu próprio título "## ..." e conteúdo DIFERENTE. NUNCA junte duas ou três em um título só (ex.: "## 💡 Essencial, Recomendações e Dicas Finais" é erro) e NUNCA repita o mesmo parágrafo em mais de uma delas:
+   - Essencial = seguro viagem, câmbio/dinheiro, voltagem, idioma, fuso horário, telefone de emergência. Ex.: "**Seguro viagem:** recomendado, com cobertura para aventura. / **Dinheiro:** leve R$ 300 em espécie. / **Voltagem:** 127V. / **Fuso:** igual a Brasília. / **Emergência:** 190 e 192."
+   - Recomendações = mala conforme o clima, costumes locais, segurança específica do destino. Ex.: "**Mala:** roupas de secagem rápida e corta-vento. / **Costumes:** guias credenciados são exigidos nas trilhas. / **Segurança:** não entre nos poços com protetor solar."
+   - Dicas Finais = economia e otimização da viagem. Ex.: "**Compre os voos com 2 a 3 meses de antecedência.** / **Feche os passeios em pacote** para baratear. / **Prefira pousada com café da manhã incluso.**"
+5. DOMÍNIOS PERMITIDOS em "Links para Reservas" — os ÚNICOS links aceitos são exatamente estes, dois ou três por grupo aplicável, e SEMPRE inclua os grupos "### Seguro Viagem", "### Chip e Internet" e "### Transfer" (além dos grupos de transporte/hospedagem/passeios aplicáveis):
+   - Voos: [Google Flights](https://www.google.com/travel/flights?q=voos%20de%20{ORIGEM}%20para%20{DESTINO}%20em%20{DATA}) e [Skyscanner](https://www.skyscanner.com.br/)
+   - Ônibus: [ClickBus](https://www.clickbus.com.br/) e [Buser](https://www.buser.com.br/)
+   - Carro Alugado: [Rentcars](https://www.rentcars.com/) e [Discover Cars](https://www.discovercars.com/)
+   - Hospedagem: [Booking.com](https://www.booking.com/searchresults.pt-br.html?ss={NOME_HOSPEDAGEM}%2C%20{CIDADE}&checkin={DATA_CHECKIN}&checkout={DATA_CHECKOUT}) — use o nome exato do hotel/pousada principal recomendado e as datas reais de check-in/check-out (AAAA-MM-DD); repita uma linha por cidade/trecho se houver mais de uma hospedagem
+   - Passeios: [GetYourGuide](https://www.getyourguide.com/s/?q={NOME_PASSEIO}%2C%20{CIDADE}), [Viator](https://www.viator.com/searchResults/all?text={NOME_PASSEIO}%2C%20{CIDADE}) e [Civitatis](https://www.civitatis.com/pt/) — use o nome exato do passeio mais recomendado nos dois primeiros; o Civitatis é SEMPRE só a página inicial, sem parâmetro (o Civitatis não tem busca por texto na URL e não segue um padrão previsível de código de cidade — nunca tente montar um link tipo civitatis.com/pt/{cidade}/)
+   - Seguro Viagem: [Real Seguro Viagem](https://www.seguroviagem.srv.br/) e [Seguros Promo](https://www.segurospromo.com.br/)
+   - Chip e Internet: [Airalo](https://www.airalo.com/)
+   - Transfer: [Kiwitaxi](https://www.kiwitaxi.com/)
+   NUNCA use um domínio fora dessa lista, mesmo que uma agência/empresa específica tenha sido mencionada em texto na conversa — o link sempre vai para um dos domínios acima.
+
+Responda somente com o roteiro reformatado.`;
+
+          try {
+            const fixRes = await callGeminiWithRetry([
+              ...conversation,
+              { role: "assistant", content: full },
+              { role: "user", content: REFORMAT_INSTRUCTION },
+            ]);
+            if (fixRes.ok) {
+              const fixData = (await fixRes.json()) as {
+                choices?: Array<{ message?: { content?: string } }>;
+              };
+              const fixed = fixData.choices?.[0]?.message?.content ?? "";
+              // Só aceita o texto reformatado se ele passou nas duas validações:
+              // marcador presente E estrutura de seções completa. Caso
+              // contrário, mantém o `full` original (mesma lógica de falha
+              // silenciosa: melhor salvar o que tem do que travar).
+              if (
+                fixed.trim() &&
+                isItineraryMessage(fixed) &&
+                hasRequiredItinerarySections(fixed)
+              ) {
+                full = fixed;
+              }
+            }
+          } catch {
+            // Falha silenciosa: melhor salvar o texto original do que travar a conversa.
+          }
+        }
+
+        if (isItineraryMessage(full)) {
+          full = await resolvePlacePhotos(full);
+          await resolvePlaceLocations(full);
+        }
+
+
+        await supabase
+          .from("messages")
+          .insert({ trip_id: trip.id, role: "assistant", content: full });
+
+        const normalizedFinal = finishReason.toLowerCase().replace(/_/g, "");
+        const stillTruncated =
+          (normalizedFinal === "length" || normalizedFinal === "maxtokens") && round >= MAX_CONTINUATIONS;
+
+        return json(
+          {
+            content: full,
+            truncated: stillTruncated,
+            debug: { finishReason, usage: totalUsage, continuations: round },
+          },
+          200,
+        );
+      },
     },
-    [navigate, session, profileQuery.data],
-  );
-
-  // Retoma o intake respondido antes do login. Importante: remove a chave do
-  // localStorage IMEDIATAMENTE ao ler, antes de criar a viagem — se essa tela
-  // rodar em duas abas ou recarregar no meio do fluxo de login, isso evita
-  // que a mesma viagem seja criada duas vezes (o que já aconteceu).
-  useEffect(() => {
-    if (loading || !session || submitted.current) return;
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (!stored) return;
-    window.localStorage.removeItem(STORAGE_KEY);
-    try {
-      void finish(JSON.parse(stored) as Answers);
-    } catch {
-      // já removido acima, nada mais a fazer
-    }
-  }, [loading, session, finish]);
-
-  function answer(value: string | string[]) {
-    if (!question) return;
-    const next: Answers = { ...answers, [question.id]: value };
-    setAnswers(next);
-    setTextValue("");
-    setMulti([]);
-    setStart("");
-    setEnd("");
-    const nextIndex = nextQuestionIndex(next, index + 1);
-    setIndex(nextIndex);
-    if (nextIndex >= INTAKE_QUESTIONS.length) void finish(next);
-  }
-
-  // Deixa corrigir uma resposta anterior sem precisar recomeçar o intake
-  // inteiro do zero. Pré-preenche o campo com o que já foi respondido antes
-  // (quando dá pra fazer isso de forma simples) pra ficar fácil só confirmar
-  // de novo ou ajustar.
-  function goBack() {
-    if (index <= 0) return;
-    const prevIndex = previousQuestionIndex(answers, index - 1);
-    const prevQuestion = INTAKE_QUESTIONS[prevIndex];
-    setTextValue("");
-    setMulti([]);
-    setStart("");
-    setEnd("");
-    if (prevQuestion) {
-      const existing = answers[prevQuestion.id];
-      if (prevQuestion.type === "text" && typeof existing === "string") setTextValue(existing);
-      if (prevQuestion.type === "multi" && Array.isArray(existing)) setMulti(existing);
-    }
-    setIndex(prevIndex);
-  }
-
-  const done = index >= INTAKE_QUESTIONS.length;
-
-  return (
-    <div className="min-h-screen bg-luna">
-      <SiteHeader />
-      <main className="mx-auto max-w-3xl px-4 py-10">
-        {usedProfileDefaults && (
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
-            <span className="flex items-center gap-2">
-              <Sparkles className="size-4 text-primary" /> Já preenchi algumas respostas com as
-              preferências do seu{" "}
-              <Link to="/perfil" className="underline underline-offset-2">
-                perfil
-              </Link>
-              .
-            </span>
-            <Button variant="ghost" size="sm" className="rounded-xl" onClick={ignoreProfileDefaults}>
-              <X className="mr-1 size-3.5" /> Não usar nesta viagem
-            </Button>
-          </div>
-        )}
-        <Progress
-          value={total ? Math.min(100, (answeredCount / total) * 100) : 0}
-          className="mb-8 h-1.5"
-        />
-
-        <div className="space-y-6">
-          {INTAKE_QUESTIONS.slice(0, index).map((q) =>
-            answers[q.id] === undefined ? null : (
-              <div key={q.id} className="space-y-3">
-                <LunaBubble text={q.prompt} />
-                <div className="flex justify-end">
-                  <p className="max-w-[80%] rounded-2xl bg-primary px-4 py-3 text-sm text-primary-foreground">
-                    {formatAnswer(answers[q.id])}
-                  </p>
-                </div>
-              </div>
-            ),
-          )}
-
-          {question && !done && (
-            <div className="space-y-4">
-              {index > 0 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="-ml-2 text-muted-foreground"
-                  onClick={goBack}
-                >
-                  <ArrowLeft className="mr-1 size-3.5" /> Voltar
-                </Button>
-              )}
-              <LunaBubble text={question.prompt} />
-
-              {question.type === "single" && (
-                <ChipRow options={question.options ?? []} onPick={(value) => answer(value)} />
-              )}
-
-              {question.type === "multi" && (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    {(question.options ?? []).map((option) => {
-                      const active = multi.includes(option);
-                      return (
-                        <button
-                          key={option}
-                          type="button"
-                          onClick={() =>
-                            setMulti((prev) => toggleMultiOption(question.id, prev, option))
-                          }
-                          className={`rounded-full border px-4 py-2 text-sm transition ${
-                            active
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border bg-card hover:bg-secondary"
-                          }`}
-                        >
-                          {active && <Check className="mr-1 inline size-3.5" />}
-                          {option}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <Button
-                    className="rounded-xl"
-                    disabled={multi.length === 0}
-                    onClick={() => answer(multi)}
-                  >
-                    Continuar
-                  </Button>
-                </div>
-              )}
-
-              {question.type === "text" && (
-                <div className="space-y-3">
-                  <ChipRow
-                    options={question.suggestions ?? []}
-                    onPick={(value) => answer(value)}
-                    subtle
-                  />
-                  <form
-                    className="flex gap-2"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      if (!textValue.trim()) return;
-                      answer(textValue.trim());
-                    }}
-                  >
-                    <Input
-                      value={textValue}
-                      onChange={(event) => setTextValue(event.target.value)}
-                      placeholder={question.placeholder ?? "Escreva aqui"}
-                      className="rounded-xl"
-                      autoFocus
-                    />
-                    <Button type="submit" className="rounded-xl" disabled={!textValue.trim()}>
-                      Enviar
-                    </Button>
-                  </form>
-                </div>
-              )}
-
-              {question.type === "dates" && (
-                <div className="card-luna flex flex-wrap items-end gap-3 p-4">
-                  <label className="text-sm">
-                    <span className="mb-1 block text-muted-foreground">Ida</span>
-                    <Input
-                      type="date"
-                      value={start}
-                      onChange={(event) => setStart(event.target.value)}
-                      className="rounded-xl"
-                    />
-                  </label>
-                  <label className="text-sm">
-                    <span className="mb-1 block text-muted-foreground">Volta</span>
-                    <Input
-                      type="date"
-                      value={end}
-                      onChange={(event) => setEnd(event.target.value)}
-                      className="rounded-xl"
-                    />
-                  </label>
-                  <Button
-                    className="rounded-xl"
-                    disabled={!start || !end}
-                    onClick={() => answer(`${formatDate(start)} a ${formatDate(end)}`)}
-                  >
-                    Confirmar datas
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="rounded-xl"
-                    onClick={() => answer("Datas ainda não definidas")}
-                  >
-                    Ainda não sei
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {done && (
-            <div className="card-luna flex items-center gap-3 p-6">
-              {creating ? (
-                <Loader2 className="size-5 animate-spin text-primary" />
-              ) : (
-                <LunaLogo size={36} />
-              )}
-              <p className="text-sm text-muted-foreground">
-                {session
-                  ? "Perfeito! Estou organizando tudo e já começo o seu planejamento…"
-                  : "Só falta entrar na sua conta para eu salvar essa viagem e continuar."}
-              </p>
-            </div>
-          )}
-          <div ref={bottomRef} />
-        </div>
-      </main>
-    </div>
-  );
-}
-
-function formatDate(value: string): string {
-  const [year, month, day] = value.split("-");
-  return `${day}/${month}/${year}`;
-}
-
-function LunaBubble({ text }: { text: string }) {
-  return (
-    <div className="flex gap-3">
-      <LunaLogo size={32} className="mt-1 shrink-0" />
-      <p className="max-w-[85%] rounded-2xl border border-border bg-card px-4 py-3 text-sm">
-        {text}
-      </p>
-    </div>
-  );
-}
-
-function ChipRow({
-  options,
-  onPick,
-  subtle,
-}: {
-  options: string[];
-  onPick: (value: string) => void;
-  subtle?: boolean;
-}) {
-  if (options.length === 0) return null;
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((option) => (
-        <button
-          key={option}
-          type="button"
-          onClick={() => onPick(option)}
-          className={`rounded-full border px-4 py-2 text-sm transition hover:bg-secondary ${
-            subtle ? "border-dashed border-border bg-background" : "border-border bg-card"
-          }`}
-        >
-          {option}
-        </button>
-      ))}
-    </div>
-  );
-}
+  },
+});
