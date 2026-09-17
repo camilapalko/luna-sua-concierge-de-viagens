@@ -267,12 +267,12 @@ REGRAS:
    - Dicas Finais = economia e otimização da viagem. Ex.: "**Compre os voos com 2 a 3 meses de antecedência.** / **Feche os passeios em pacote** para baratear. / **Prefira pousada com café da manhã incluso.**"
 5. DOMÍNIOS PERMITIDOS em "Links para Reservas" — os ÚNICOS links aceitos são exatamente estes, dois ou três por grupo aplicável, e SEMPRE inclua os grupos "### Seguro Viagem", "### Chip e Internet" e "### Transfer" (além dos grupos de transporte/hospedagem/passeios aplicáveis):
    - Voos: [Google Flights](https://www.google.com/travel/flights?q=voos%20de%20{ORIGEM}%20para%20{DESTINO}%20em%20{DATA}) e [Skyscanner](https://www.skyscanner.com.br/)
-   - Ônibus: [ClickBus](https://www.clickbus.com.br/) e [Buser](https://www.buser.com.br/)
+   - Ônibus: [ClickBus](https://www.clickbus.com.br/) (sempre só a home, sem tentar completar — o ClickBus exige o terminal exato, que não dá pra adivinhar) e [Buser](https://www.buser.com.br/onibus/{ORIGEM_SLUG}/{DESTINO_SLUG}?ida={DATA_IDA}) — {ORIGEM_SLUG}/{DESTINO_SLUG} são cidade+UF em minúsculas com hífen (ex.: "sao-paulo-sp"), {DATA_IDA} é a data real de ida (AAAA-MM-DD)
    - Carro Alugado: [Rentcars](https://www.rentcars.com/) e [Discover Cars](https://www.discovercars.com/)
    - Hospedagem: [Booking.com](https://www.booking.com/searchresults.pt-br.html?ss={NOME_HOSPEDAGEM}%2C%20{CIDADE}&checkin={DATA_CHECKIN}&checkout={DATA_CHECKOUT}) — use o nome exato do hotel/pousada principal recomendado e as datas reais de check-in/check-out (AAAA-MM-DD); repita uma linha por cidade/trecho se houver mais de uma hospedagem
    - Passeios: [GetYourGuide](https://www.getyourguide.com/s/?q={NOME_PASSEIO}%2C%20{CIDADE}), [Viator](https://www.viator.com/searchResults/all?text={NOME_PASSEIO}%2C%20{CIDADE}) e [Civitatis](https://www.civitatis.com/pt/) — use o nome exato do passeio mais recomendado nos dois primeiros; o Civitatis é SEMPRE só a página inicial, sem parâmetro (o Civitatis não tem busca por texto na URL e não segue um padrão previsível de código de cidade — nunca tente montar um link tipo civitatis.com/pt/{cidade}/)
    - Seguro Viagem: [Real Seguro Viagem](https://www.seguroviagem.srv.br/) e [Seguros Promo](https://www.segurospromo.com.br/)
-   - Chip e Internet: [Airalo](https://www.airalo.com/)
+   - Chip e Internet: [Airalo](https://www.airalo.com/{PAIS_SLUG}-esim) — {PAIS_SLUG} é o nome do país de destino EM INGLÊS, minúsculo, com hífen (ex.: Portugal="portugal", Estados Unidos="united-states", Brasil="brazil"); se a viagem for só dentro do Brasil, use https://www.airalo.com/ sem slug
    - Transfer: [Kiwitaxi](https://www.kiwitaxi.com/)
    NUNCA use um domínio fora dessa lista, mesmo que uma agência/empresa específica tenha sido mencionada em texto na conversa — o link sempre vai para um dos domínios acima.
 
