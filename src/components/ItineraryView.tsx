@@ -69,6 +69,16 @@ function ChecklistBlock({ items }: { items: string[] }) {
   );
 }
 
+// Gera um link de busca do GetYourGuide já com o nome específico do
+// passeio (ex.: "Beach Park, Aquiraz"), reaproveitando o mesmo dado que já
+// alimenta o marcador do mapa ({{LOCAL: ...}}). Isso evita ter que confiar
+// na IA pra gerar um link por atividade (risco de link inventado/quebrado):
+// o link é montado aqui no código, com um parâmetro de busca por texto que
+// já foi validado manualmente no GetYourGuide.
+function activityBookingUrl(place: string): string {
+  return `https://www.getyourguide.com/s/?q=${encodeURIComponent(place)}`;
+}
+
 function LinkCards({ body, empty }: { body: string; empty: string }) {
   const links = extractLinks(body);
   if (links.length === 0) {
@@ -173,13 +183,28 @@ export function ItineraryView({
                 <ul className="mt-3 space-y-2">
                   {day.activities.map((activity, index) => {
                     const Icon = ICONS[activity.kind];
+                    const place: string | undefined = activity.places[0];
+                    const placeLabel = place ? (place.split(",")[0] ?? place).trim() : "";
                     return (
                       <li
                         key={activity.text + index}
                         className="flex items-start gap-3 rounded-xl bg-muted/60 p-3"
                       >
                         <Icon className="mt-0.5 size-4 shrink-0 text-primary" />
-                        <span className="text-sm">{activity.text}</span>
+                        <div className="flex-1">
+                          <span className="text-sm">{activity.text}</span>
+                          {activity.kind === "passeio" && place && (
+                            <a
+                              href={activityBookingUrl(place)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-1 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                            >
+                              <ExternalLink className="size-3" />
+                              Reservar {placeLabel}
+                            </a>
+                          )}
+                        </div>
                       </li>
                     );
                   })}
