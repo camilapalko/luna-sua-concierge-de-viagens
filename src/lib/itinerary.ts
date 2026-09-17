@@ -22,6 +22,9 @@ export type Itinerary = {
   linksTransporte: string;
   linksHospedagem: string;
   linksPasseios: string;
+  linksSeguro: string;
+  linksChip: string;
+  linksTransfer: string;
   checklist: string[];
   essencial: string;
   recomendacoes: string;
@@ -163,11 +166,61 @@ export function parseItinerary(content: string): Itinerary {
     linksTransporte: pickAll(linkGroups, ["voo", "onibus", "carro"]),
     linksHospedagem: pick(linkGroups, ["hosped"]),
     linksPasseios: pick(linkGroups, ["passeio"]),
+    linksSeguro: pick(linkGroups, ["seguro"]),
+    linksChip: pick(linkGroups, ["chip", "internet", "esim"]),
+    linksTransfer: pick(linkGroups, ["transfer"]),
     checklist: parseChecklist(pick(sections, ["checklist"])),
     essencial: pick(sections, ["essencial"]),
     recomendacoes: pick(sections, ["recomenda"]),
     dicas: pick(sections, ["dicas"]),
   };
+}
+
+// Domínios que a Luna tem autorização para usar nos links de "Links para
+// Reservas" — ver a lista espelhada no prompt (src/lib/luna-prompt.ts) e no
+// REFORMAT_INSTRUCTION (src/routes/api/chat.ts). Qualquer link fora dessa
+// lista é sinal de que a IA inventou um link de empresa/agência específica
+// em vez de usar os templates de busca genéricos combinados — algo que já
+// aconteceu na prática (ex.: links pra sites de turismo regional que nem
+// existem, ou pra home de uma companhia aérea sem nenhuma busca real).
+const ALLOWED_LINK_DOMAINS = [
+  "google.com",
+  "skyscanner.com",
+  "skyscanner.com.br",
+  "clickbus.com.br",
+  "buser.com.br",
+  "rentcars.com",
+  "rentcars.com.br",
+  "discovercars.com",
+  "booking.com",
+  "getyourguide.com",
+  "viator.com",
+  "seguroviagem.srv.br",
+  "segurospromo.com.br",
+  "airalo.com",
+  "kiwitaxi.com",
+];
+
+// Confere se TODAS as URLs dentro da seção "Links para Reservas" pertencem
+// à lista de domínios permitidos acima. Aceita subdomínios (ex.:
+// "www.booking.com" e "pt.booking.com" contam como "booking.com") batendo
+// pelo final do hostname.
+export function hasOnlyAllowedLinkDomains(content: string): boolean {
+  const sections = splitSections(content);
+  const linksBody = pick(sections, ["links"]);
+  if (!linksBody) return true;
+  const links = extractLinks(linksBody);
+  return links.every((link) => {
+    let hostname: string;
+    try {
+      hostname = new URL(link.url).hostname.toLowerCase();
+    } catch {
+      return false;
+    }
+    return ALLOWED_LINK_DOMAINS.some(
+      (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+    );
+  });
 }
 
 // O marcador "# 🌟 SEU ROTEIRO COMPLETO" sozinho não garante roteiro pronto:
@@ -184,6 +237,7 @@ export function hasRequiredItinerarySections(content: string): boolean {
     Object.keys(sections).find((k) => keywords.some((word) => k.includes(word))) ?? null;
   if (!has(["documentacao", "requisitos"])) return false;
   if (!has(["links"])) return false;
+  if (!hasOnlyAllowedLinkDomains(content)) return false;
   const diasBody = pick(sections, ["roteiro dia", "dia a dia"]);
   if (!diasBody) return false;
   if (parseDays(diasBody).length < 1) return false;
