@@ -44,7 +44,7 @@ export function isItineraryMessage(content: string): boolean {
 function normalize(value: string): string {
   return value
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z ]/gi, "")
     .trim()
     .toLowerCase();
@@ -199,6 +199,7 @@ const ALLOWED_LINK_DOMAINS = [
   "segurospromo.com.br",
   "airalo.com",
   "kiwitaxi.com",
+  "civitatis.com",
 ];
 
 // Confere se TODAS as URLs dentro da seção "Links para Reservas" pertencem
