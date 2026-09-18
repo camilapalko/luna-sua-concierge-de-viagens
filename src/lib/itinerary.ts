@@ -257,6 +257,69 @@ export function hasRequiredItinerarySections(content: string): boolean {
   return true;
 }
 
+// --- Serialização de volta pra Markdown (edição direta do roteiro) ---
+//
+// A edição direta (remover/reordenar atividades sem passar pela IA) só
+// mexe na seção "Roteiro Dia a Dia" — todas as outras seções (documentação,
+// hospedagem, links etc.) ficam exatamente como a Luna escreveu, sem
+// nenhuma tentativa de reconstruir texto que já está certo. Isso evita o
+// risco de uma reconstrução genérica "perder" nuances de outras seções que
+// o parser não guarda 1:1 (ex.: os links de Voos/Ônibus/Carro são fundidos
+// num único campo pro app exibir agrupado — reconstruir a partir DAÍ
+// mudaria a subdivisão original). Editar só o pedaço editado é mais seguro.
+
+const ACTIVITY_KIND_LABEL: Record<Exclude<ItineraryActivity["kind"], "outro">, string> = {
+  voo: "voo",
+  refeicao: "refeição",
+  passeio: "passeio",
+  transporte: "transporte",
+  hospedagem: "hospedagem",
+};
+
+function serializeActivityLine(activity: ItineraryActivity): string {
+  const tag = activity.kind === "outro" ? "" : `[${ACTIVITY_KIND_LABEL[activity.kind]}] `;
+  const place = activity.places[0];
+  const local = place ? ` {{LOCAL: ${place}}}` : "";
+  return `- ${tag}${activity.text}${local}`;
+}
+
+export function serializeDays(dias: ItineraryDay[]): string {
+  return dias
+    .map((day) => {
+      const lines = day.activities.map(serializeActivityLine).join("\n");
+      return `### ${day.title}\n${lines}`;
+    })
+    .join("\n\n");
+}
+
+// Substitui SÓ o corpo da seção "Roteiro Dia a Dia" dentro do texto bruto
+// original, preservando literalmente todo o resto do roteiro (cabeçalho,
+// outras seções, formatação). Localiza a seção pelo mesmo critério de
+// palavra-chave usado no resto deste arquivo (splitSections/pick), então
+// continua funcionando mesmo que a Luna varie levemente o emoji do título.
+export function updateDaysInRawContent(raw: string, dias: ItineraryDay[]): string {
+  const headingRegex = /^##\s+.*$/gm;
+  const matches = Array.from(raw.matchAll(headingRegex));
+  const targetIndex = matches.findIndex((m) => {
+    const title = normalize(m[0].replace(/^##\s+/, ""));
+    return title.includes("roteiro dia") || title.includes("dia a dia");
+  });
+  if (targetIndex === -1) return raw;
+
+  const target = matches[targetIndex]!;
+  const bodyStart = target.index! + target[0].length;
+  const bodyEnd =
+    targetIndex + 1 < matches.length ? matches[targetIndex + 1]!.index! : raw.length;
+
+  const before = raw.slice(0, bodyStart);
+  const after = raw.slice(bodyEnd);
+  const newBody = `
+${serializeDays(dias)}
+
+`;
+  return `${before}${newBody}${after}`;
+}
+
 export function findLatestItinerary(
   messages: Array<{ role: string; content: string }>,
 ): Itinerary | null {
