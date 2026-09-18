@@ -117,6 +117,31 @@ export const updateTripStatus = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Salva uma edição direta do roteiro (remover/reordenar atividades na tela,
+// sem passar pela IA). Grava como uma nova mensagem "assistant" — assim
+// findLatestItinerary() já pega essa versão como a mais recente na próxima
+// leitura — e também atualiza trips.itinerary_content, que é o campo que
+// alimenta a página pública de compartilhamento.
+export const saveItineraryEdit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { tripId: string; content: string }) => input)
+  .handler(async ({ data, context }) => {
+    const { error: msgError } = await context.supabase.from("messages").insert({
+      trip_id: data.tripId,
+      role: "assistant",
+      content: data.content,
+    });
+    if (msgError) throw new Error(msgError.message);
+
+    const { error } = await context.supabase
+      .from("trips")
+      .update({ status: "finalizada", itinerary_content: data.content })
+      .eq("id", data.tripId);
+    if (error) throw new Error(error.message);
+
+    return { ok: true };
+  });
+
 export const deleteTrip = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { tripId: string }) => input)
