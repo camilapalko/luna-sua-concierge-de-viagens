@@ -12,7 +12,7 @@ import { ItineraryView } from "@/components/ItineraryView";
 import { ShareTripPanel } from "@/components/ShareTripPanel";
 import { TripProfileDialog } from "@/components/TripProfileDialog";
 import { findLatestItinerary } from "@/lib/itinerary";
-import { getTrip, updateTripStatus, type MessageRow } from "@/lib/trips.functions";
+import { getTrip, updateTripStatus, saveItineraryEdit, type MessageRow } from "@/lib/trips.functions";
 import { useSession } from "@/hooks/useSession";
 
 export const Route = createFileRoute("/minhas-viagens/$tripId")({
@@ -39,6 +39,7 @@ function TripPage() {
   const navigate = useNavigate();
   const fetchTrip = useServerFn(getTrip);
   const markFinished = useServerFn(updateTripStatus);
+  const saveEdit = useServerFn(saveItineraryEdit);
   const queryClient = useQueryClient();
   const [liveMessages, setLiveMessages] = useState<Array<Pick<MessageRow, "role" | "content">>>([]);
   const syncedStatus = useRef(false);
@@ -160,7 +161,14 @@ function TripPage() {
                     onChange={() => queryClient.invalidateQueries({ queryKey: ["trip", tripId] })}
                   />
                 </div>
-                <ItineraryView itinerary={itinerary} destination={data.trip.destination} />
+                <ItineraryView
+                  itinerary={itinerary}
+                  destination={data.trip.destination}
+                  onEditDays={async (content) => {
+                    await saveEdit({ data: { tripId: data.trip.id, content } });
+                    await queryClient.invalidateQueries({ queryKey: ["trip", tripId] });
+                  }}
+                />
               </div>
             ) : (
               <div className="card-luna p-10 text-center">
