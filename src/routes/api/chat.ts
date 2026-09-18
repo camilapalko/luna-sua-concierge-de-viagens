@@ -120,19 +120,30 @@ export const Route = createFileRoute("/api/chat")({
           });
         }
 
-        // A API da Gemini às vezes falha de forma transitória (5xx, sobrecarga
-        // momentânea) mesmo com tudo certo do nosso lado. Antes, qualquer
-        // falha assim já desistia na hora e mostrava um erro genérico sem
-        // nenhuma pista do que aconteceu. Agora: (1) tentamos de novo uma vez
-        // após uma pequena espera se for um erro 5xx, e (2) se ainda assim
-        // falhar, incluímos o status HTTP e um trecho da resposta da Gemini
-        // na mensagem de erro, para dar pra diagnosticar de verdade da
-        // próxima vez, em vez de adivinhar.
+        // A API da Gemini às vezes falha de forma transitória (5xx, "high
+        // demand"/UNAVAILABLE, sobrecarga momentânea) mesmo com tudo certo do
+        // nosso lado. Uma única tentativa extra não é suficiente nos picos de
+        // demanda — por isso tentamos até 4 vezes no total (1 tentativa
+        // original + 3 retries) com espera crescente entre elas (1s, 2.5s,
+        // 5s), sempre que o erro for 5xx. Isso dá até ~8.5s de folga pro
+        // pico de demanda passar antes de desistir e mostrar erro pro
+        // usuário. Cada tentativa que falhar é registrada no log do servidor
+        // (console.error) com status e trecho da resposta, pra dar pra
+        // diagnosticar sem expor esse detalhe técnico cru pro usuário.
         async function callGeminiWithRetry(conversation: AiMessage[]) {
-          const first = await callGemini(conversation);
-          if (first.status < 500) return first;
-          await new Promise((resolve) => setTimeout(resolve, 1500));
-          return callGemini(conversation);
+          const retryDelaysMs = [1000, 2500, 5000];
+          let res = await callGemini(conversation);
+          let attempt = 0;
+          while (res.status >= 500 && attempt < retryDelaysMs.length) {
+            const bodyText = await res.clone().text().catch(() => "");
+            console.error(
+              `Gemini API retry ${attempt + 1}/${retryDelaysMs.length} após HTTP ${res.status}: ${bodyText.slice(0, 300)}`,
+            );
+            await new Promise((resolve) => setTimeout(resolve, retryDelaysMs[attempt]));
+            res = await callGemini(conversation);
+            attempt += 1;
+          }
+          return res;
         }
 
         const MAX_CONTINUATIONS = 3;
@@ -163,12 +174,12 @@ export const Route = createFileRoute("/api/chat")({
             if (full.trim()) break;
             const bodyText = await aiRes.text().catch(() => "");
             const snippet = bodyText.slice(0, 300);
-            return json(
-              {
-                error: `A Luna não conseguiu responder agora. (HTTP ${aiRes.status}${snippet ? `: ${snippet}` : ""})`,
-              },
-              500,
-            );
+            console.error(`Gemini API falhou após todas as tentativas (HTTP ${aiRes.status}): ${snippet}`);
+            const friendlyMessage =
+              aiRes.status >= 500
+                ? "A Luna está recebendo muitas mensagens ao mesmo tempo agora. Aguarde um instante e toque em \"Tentar novamente\"."
+                : `A Luna não conseguiu responder agora. (HTTP ${aiRes.status})`;
+            return json({ error: friendlyMessage }, 500);
           }
 
           const data = (await aiRes.json()) as {
