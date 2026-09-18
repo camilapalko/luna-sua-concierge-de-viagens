@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
   INTAKE_QUESTIONS,
-  nextQuestionIndex,
   previousQuestionIndex,
   profileSummary,
   formatAnswer,
@@ -91,6 +90,22 @@ export const Route = createFileRoute("/chat")({
   component: ChatPage,
 });
 
+// nextQuestionIndex (de @/lib/intake) so pula perguntas ESCONDIDAS pela
+// condicao `skip` -- ele nao verifica se a pergunta ja tem resposta. Isso
+// funciona bem no fluxo normal (uma pergunta de cada vez, sempre em ordem),
+// mas quebra quando varias respostas sao preenchidas de uma vez fora de
+// ordem (perfil salvo ou os atalhos de inicio rapido abaixo): a tela ficava
+// presa mostrando de novo a primeira pergunta, mesmo ja tendo uma resposta
+// pra ela. Esta versao pula tanto as escondidas quanto as ja respondidas.
+function nextUnansweredIndex(answers: Answers): number {
+  for (let i = 0; i < INTAKE_QUESTIONS.length; i++) {
+    const q = INTAKE_QUESTIONS[i]!;
+    if (q.skip?.(answers)) continue;
+    if (answers[q.id] === undefined) return i;
+  }
+  return INTAKE_QUESTIONS.length;
+}
+
 function ChatPage() {
   const navigate = useNavigate();
   const { session, loading } = useSession();
@@ -146,7 +161,7 @@ function ChatPage() {
     profileApplied.current = true;
     const merged: Answers = { ...defaults, __hasMiles: hasMiles ? "yes" : "no" };
     setAnswers(merged);
-    setIndex(nextQuestionIndex(merged, 0));
+    setIndex(nextUnansweredIndex(merged));
     setUsedProfileDefaults(true);
   }, [profileQuery.data, index, answers]);
 
@@ -166,7 +181,7 @@ function ChatPage() {
     profileApplied.current = true;
     const merged: Answers = { ...answers, ...partial };
     setAnswers(merged);
-    setIndex(nextQuestionIndex(merged, 0));
+    setIndex(nextUnansweredIndex(merged));
     setQuickStartOpen(false);
     setQuickText("");
   }
@@ -246,7 +261,14 @@ function ChatPage() {
     setMulti([]);
     setStart("");
     setEnd("");
-    const nextIndex = nextQuestionIndex(next, index + 1);
+    // Usa nextUnansweredIndex (nao o nextQuestionIndex puro) pra tambem
+    // pular perguntas que ja tenham resposta -- isso importa quando um chip
+    // de inicio rapido, o perfil salvo, ou um "Voltar" deixou respostas
+    // preenchidas mais a frente na fila. Sem isso, a tela voltava a exibir
+    // como "pendente" uma pergunta que a pessoa (ou o atalho) ja respondeu,
+    // contrariando a mesma regra que o prompt da Luna segue no chat: nunca
+    // repetir uma pergunta que ja foi respondida.
+    const nextIndex = nextUnansweredIndex(next);
     setIndex(nextIndex);
     if (nextIndex >= INTAKE_QUESTIONS.length) void finish(next);
   }
