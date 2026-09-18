@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Plane,
   UtensilsCrossed,
@@ -10,6 +10,12 @@ import {
   ExternalLink,
   Lightbulb,
   Luggage,
+  Download,
+  Loader2,
+  Pencil,
+  ArrowUp,
+  ArrowDown,
+  X,
 } from "lucide-react";
 import { Markdown } from "@/components/Markdown";
 import {
@@ -22,12 +28,46 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { TripMap } from "@/components/TripMap";
+import { downloadItineraryPdf } from "@/lib/itinerary-pdf";
+import { toast } from "sonner";
 import {
   extractImageNames,
   extractLinks,
+  updateDaysInRawContent,
   type Itinerary,
   type ItineraryActivity,
+  type ItineraryDay,
 } from "@/lib/itinerary";
+
+// Botão de download do roteiro em PDF — usa o MESMO objeto `itinerary` já
+// parseado que alimenta a tela (ver src/lib/itinerary-pdf.ts). Fica isolado
+// num componente próprio só pra controlar o estado de "gerando..." sem
+// misturar com o resto da view.
+function DownloadPdfButton({ itinerary, destination }: { itinerary: Itinerary; destination: string }) {
+  const [generating, setGenerating] = useState(false);
+
+  async function handleDownload() {
+    setGenerating(true);
+    try {
+      await downloadItineraryPdf(itinerary, destination);
+    } catch {
+      toast.error("Não consegui gerar o PDF agora. Tente de novo em instantes.");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  return (
+    <Button variant="secondary" size="sm" onClick={handleDownload} disabled={generating}>
+      {generating ? (
+        <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+      ) : (
+        <Download className="mr-1.5 size-3.5" />
+      )}
+      {generating ? "Gerando PDF..." : "Baixar PDF"}
+    </Button>
+  );
+}
 
 const ICONS: Record<ItineraryActivity["kind"], typeof Plane> = {
   voo: Plane,
@@ -104,12 +144,168 @@ function LinkCards({ body, empty }: { body: string; empty: string }) {
   );
 }
 
+// Seção "Roteiro dia a dia" com edição direta opcional (remover/reordenar
+// atividades sem passar pela IA). `onEditDays` só vem preenchido na aba
+// "Viagem" autenticada (ver src/routes/minhas-viagens/$tripId.tsx) — no
+// link público de compartilhamento (roteiro/$token.tsx) a prop não é
+// passada, então os controles de edição nem aparecem.
+//
+// Estado local otimista: a mudança aparece na hora, e só é revertida se o
+// salvamento no servidor falhar. Ressincronizamos com `itinerary.dias`
+// sempre que o texto bruto do roteiro muda de verdade (ex.: a Luna gerou
+// uma nova versão pelo chat) — o `itinerary.raw` como dependência garante
+// isso sem apagar uma edição em andamento por engano.
+function DayByDaySection({
+  itinerary,
+  onEditDays,
+}: {
+  itinerary: Itinerary;
+  onEditDays?: ((rawContent: string) => Promise<void>) | undefined;
+}) {
+  const [editMode, setEditMode] = useState(false);
+  const [days, setDays] = useState<ItineraryDay[]>(itinerary.dias);
+
+  useEffect(() => {
+    setDays(itinerary.dias);
+  }, [itinerary.raw]);
+
+  async function persist(nextDays: ItineraryDay[]) {
+    const previous = days;
+    setDays(nextDays);
+    if (!onEditDays) return;
+    try {
+      await onEditDays(updateDaysInRawContent(itinerary.raw, nextDays));
+    } catch {
+      setDays(previous);
+      toast.error("Não consegui salvar essa alteração. Tente de novo.");
+    }
+  }
+
+  function removeActivity(dayIndex: number, activityIndex: number) {
+    void persist(
+      days.map((day, di) =>
+        di === dayIndex
+          ? { ...day, activities: day.activities.filter((_, ai) => ai !== activityIndex) }
+          : day,
+      ),
+    );
+  }
+
+  function moveActivity(dayIndex: number, activityIndex: number, direction: -1 | 1) {
+    const day = days[dayIndex];
+    if (!day) return;
+    const target = activityIndex + direction;
+    if (target < 0 || target >= day.activities.length) return;
+    const activities = [...day.activities];
+    const [moved] = activities.splice(activityIndex, 1);
+    activities.splice(target, 0, moved!);
+    void persist(days.map((d, di) => (di === dayIndex ? { ...d, activities } : d)));
+  }
+
+  if (days.length === 0) return null;
+
+  return (
+    <section className="card-luna p-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-display text-xl font-semibold">Roteiro dia a dia</h3>
+        {onEditDays && (
+          <Button
+            variant={editMode ? "default" : "secondary"}
+            size="sm"
+            onClick={() => setEditMode((v) => !v)}
+          >
+            <Pencil className="mr-1.5 size-3.5" />
+            {editMode ? "Concluir edição" : "Editar roteiro"}
+          </Button>
+        )}
+      </div>
+      {editMode && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Reordene ou remova atividades — a mudança já é salva na hora, sem precisar pedir pra
+          Luna.
+        </p>
+      )}
+      <ol className="mt-5 space-y-6 border-l border-border pl-6">
+        {days.map((day, dayIndex) => (
+          <li key={day.title} className="relative">
+            <span className="absolute -left-[31px] top-1 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <Sparkles className="size-3" />
+            </span>
+            <h4 className="font-display text-lg font-semibold">{day.title}</h4>
+            <ul className="mt-3 space-y-2">
+              {day.activities.map((activity, index) => {
+                const Icon = ICONS[activity.kind];
+                const place: string | undefined = activity.places[0];
+                const placeLabel = place ? (place.split(",")[0] ?? place).trim() : "";
+                return (
+                  <li
+                    key={activity.text + index}
+                    className="flex items-start gap-3 rounded-xl bg-muted/60 p-3"
+                  >
+                    <Icon className="mt-0.5 size-4 shrink-0 text-primary" />
+                    <div className="flex-1">
+                      <span className="text-sm">{activity.text}</span>
+                      {activity.kind === "passeio" && place && !editMode && (
+                        <a
+                          href={activityBookingUrl(place)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                        >
+                          <ExternalLink className="size-3" />
+                          Reservar {placeLabel}
+                        </a>
+                      )}
+                    </div>
+                    {editMode && (
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          aria-label="Mover atividade pra cima"
+                          disabled={index === 0}
+                          onClick={() => moveActivity(dayIndex, index, -1)}
+                          className="rounded-md p-1 text-muted-foreground transition hover:bg-background disabled:opacity-30"
+                        >
+                          <ArrowUp className="size-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Mover atividade pra baixo"
+                          disabled={index === day.activities.length - 1}
+                          onClick={() => moveActivity(dayIndex, index, 1)}
+                          className="rounded-md p-1 text-muted-foreground transition hover:bg-background disabled:opacity-30"
+                        >
+                          <ArrowDown className="size-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Remover atividade"
+                          onClick={() => removeActivity(dayIndex, index)}
+                          className="rounded-md p-1 text-destructive transition hover:bg-destructive/10"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 export function ItineraryView({
   itinerary,
   destination,
+  onEditDays,
 }: {
   itinerary: Itinerary;
   destination?: string;
+  onEditDays?: ((rawContent: string) => Promise<void>) | undefined;
 }) {
   const overviewNames = useMemo(
     () => [...extractImageNames(itinerary.hospedagem), ...extractImageNames(itinerary.restaurantes)],
@@ -129,11 +325,16 @@ export function ItineraryView({
   return (
     <div className="space-y-6">
       <header className="rounded-2xl bg-gradient-to-br from-primary/10 via-secondary/40 to-accent/30 p-6">
-        <p className="text-xs font-semibold uppercase tracking-widest text-primary">Luna</p>
-        <h2 className="mt-1 font-display text-3xl font-semibold">Seu roteiro completo</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Tudo organizado: documentos, dia a dia, restaurantes, reservas e checklist.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-primary">Luna</p>
+            <h2 className="mt-1 font-display text-3xl font-semibold">Seu roteiro completo</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Tudo organizado: documentos, dia a dia, restaurantes, reservas e checklist.
+            </p>
+          </div>
+          {destination && <DownloadPdfButton itinerary={itinerary} destination={destination} />}
+        </div>
       </header>
 
       {destination && (
@@ -170,50 +371,7 @@ export function ItineraryView({
         </section>
       )}
 
-      {itinerary.dias.length > 0 && (
-        <section className="card-luna p-6">
-          <h3 className="font-display text-xl font-semibold">Roteiro dia a dia</h3>
-          <ol className="mt-5 space-y-6 border-l border-border pl-6">
-            {itinerary.dias.map((day) => (
-              <li key={day.title} className="relative">
-                <span className="absolute -left-[31px] top-1 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  <Sparkles className="size-3" />
-                </span>
-                <h4 className="font-display text-lg font-semibold">{day.title}</h4>
-                <ul className="mt-3 space-y-2">
-                  {day.activities.map((activity, index) => {
-                    const Icon = ICONS[activity.kind];
-                    const place: string | undefined = activity.places[0];
-                    const placeLabel = place ? (place.split(",")[0] ?? place).trim() : "";
-                    return (
-                      <li
-                        key={activity.text + index}
-                        className="flex items-start gap-3 rounded-xl bg-muted/60 p-3"
-                      >
-                        <Icon className="mt-0.5 size-4 shrink-0 text-primary" />
-                        <div className="flex-1">
-                          <span className="text-sm">{activity.text}</span>
-                          {activity.kind === "passeio" && place && (
-                            <a
-                              href={activityBookingUrl(place)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-1 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                            >
-                              <ExternalLink className="size-3" />
-                              Reservar {placeLabel}
-                            </a>
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
+      <DayByDaySection itinerary={itinerary} onEditDays={onEditDays} />
 
       {itinerary.restaurantes && (
         <section className="card-luna p-6">
