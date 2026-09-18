@@ -21,7 +21,54 @@ import {
 } from "@/lib/intake";
 import { createTrip } from "@/lib/trips.functions";
 import { getMyProfile } from "@/lib/profile.functions";
+import { parseQuickStart } from "@/lib/quick-start.functions";
 import { useSession } from "@/hooks/useSession";
+
+// Atalhos pra quem ja sabe o que quer e nao quer responder pergunta por
+// pergunta -- ficam escondidos atras de um link opcional (ver
+// QuickStartPanel), pra nao poluir a tela de quem prefere o fluxo normal.
+// Cada chip preenche de uma vez varios campos do intake (os mesmos que o
+// modo "conte com suas palavras" tenta extrair via IA em quick-start.functions.ts),
+// e o fluxo pula direto pra proxima pergunta que ainda falta responder.
+const QUICK_START_PRESETS: Array<{ label: string; answers: Answers }> = [
+  {
+    label: "Lua de mel romântica",
+    answers: {
+      service_type: "Viagem Completa",
+      travelers: "Em casal",
+      budget: "Luxo",
+      interests: ["Gastronomia", "Relaxamento"],
+    },
+  },
+  {
+    label: "Mochilão econômico",
+    answers: {
+      service_type: "Viagem Completa",
+      travelers: "Sozinho(a)",
+      budget: "Econômico",
+      interests: ["Natureza & Aventura", "Cultura & História"],
+    },
+  },
+  {
+    label: "Praia em família",
+    answers: {
+      service_type: "Viagem Completa",
+      destination: "Nordeste Brasileiro",
+      travelers: "Família",
+      budget: "Moderado",
+      interests: ["Relaxamento"],
+    },
+  },
+  {
+    label: "Fim de semana com amigos",
+    answers: {
+      service_type: "Viagem Completa",
+      travelers: "Amigos",
+      budget: "Moderado",
+      interests: ["Vida Noturna", "Gastronomia"],
+    },
+  },
+];
 
 const STORAGE_KEY = "luna:intake-pendente";
 
@@ -55,11 +102,15 @@ function ChatPage() {
   const [end, setEnd] = useState("");
   const [creating, setCreating] = useState(false);
   const [usedProfileDefaults, setUsedProfileDefaults] = useState(false);
+  const [quickStartOpen, setQuickStartOpen] = useState(false);
+  const [quickText, setQuickText] = useState("");
+  const [parsingQuickText, setParsingQuickText] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const submitted = useRef(false);
   const profileApplied = useRef(false);
 
   const fetchProfile = useServerFn(getMyProfile);
+  const parseQuickStartText = useServerFn(parseQuickStart);
   const profileQuery = useQuery({
     queryKey: ["my-profile", session?.user.id],
     queryFn: () => fetchProfile(),
@@ -104,6 +155,40 @@ function ChatPage() {
     setUsedProfileDefaults(false);
     setAnswers({});
     setIndex(0);
+  }
+
+  // Usada tanto pelos chips de ideia pronta quanto pelo modo "conte com suas
+  // palavras" (depois da IA extrair o que der) -- as duas formas de atalho
+  // convergem pra essa mesma funcao, preenchendo varias respostas de uma vez
+  // e pulando direto pra proxima pergunta que ainda falta.
+  function applyQuickStart(partial: Answers) {
+    if (Object.keys(partial).length === 0) return;
+    profileApplied.current = true;
+    const merged: Answers = { ...answers, ...partial };
+    setAnswers(merged);
+    setIndex(nextQuestionIndex(merged, 0));
+    setQuickStartOpen(false);
+    setQuickText("");
+  }
+
+  async function submitQuickText() {
+    const text = quickText.trim();
+    if (!text) return;
+    setParsingQuickText(true);
+    try {
+      const partial = await parseQuickStartText({ data: { text } });
+      if (Object.keys(partial).length === 0) {
+        toast.error(
+          "Não consegui identificar nada certeiro nessa descrição — tente uma ideia pronta ou responda as perguntas normalmente.",
+        );
+        return;
+      }
+      applyQuickStart(partial as Answers);
+    } catch {
+      toast.error("Não consegui processar agora. Tente de novo.");
+    } finally {
+      setParsingQuickText(false);
+    }
   }
 
   const finish = useCallback(
@@ -239,6 +324,18 @@ function ChatPage() {
                   <ArrowLeft className="mr-1 size-3.5" /> Voltar
                 </Button>
               )}
+              {index === 0 && !usedProfileDefaults && (
+                <QuickStartPanel
+                  open={quickStartOpen}
+                  onToggle={() => setQuickStartOpen((v) => !v)}
+                  onPickPreset={applyQuickStart}
+                  quickText={quickText}
+                  onQuickTextChange={setQuickText}
+                  onSubmitText={submitQuickText}
+                  loading={parsingQuickText}
+                />
+              )}
+
               <LunaBubble text={question.prompt} />
 
               {question.type === "single" && (
@@ -380,6 +477,79 @@ function LunaBubble({ text }: { text: string }) {
       <p className="max-w-[85%] rounded-2xl border border-border bg-card px-4 py-3 text-sm">
         {text}
       </p>
+    </div>
+  );
+}
+
+// Painel opcional de atalho: fica escondido atras de um link, so aparece na
+// primeira pergunta, e some assim que a pessoa usa um dos dois caminhos --
+// combina os "chips de ideia pronta" (instantaneo, sem IA) com o "conte com
+// suas palavras" (texto livre, interpretado por IA em quick-start.functions.ts)
+// no mesmo espaco compacto, pra nao duplicar UI nem poluir a tela de quem
+// prefere so responder as perguntas normalmente.
+function QuickStartPanel({
+  open,
+  onToggle,
+  onPickPreset,
+  quickText,
+  onQuickTextChange,
+  onSubmitText,
+  loading,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  onPickPreset: (answers: Answers) => void;
+  quickText: string;
+  onQuickTextChange: (value: string) => void;
+  onSubmitText: () => void;
+  loading: boolean;
+}) {
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="text-xs font-medium text-primary hover:underline underline-offset-2"
+      >
+        {open ? "Prefiro responder as perguntas" : "✨ Já sei o que eu quero, quero ir direto ao ponto"}
+      </button>
+      {open && (
+        <div className="card-luna mt-3 space-y-3 p-4">
+          <p className="text-xs text-muted-foreground">
+            Escolha uma ideia pra começar mais rápido, ou descreva com suas palavras:
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {QUICK_START_PRESETS.map((preset) => (
+              <button
+                key={preset.label}
+                type="button"
+                onClick={() => onPickPreset(preset.answers)}
+                className="rounded-full border border-dashed border-border bg-background px-4 py-2 text-sm transition hover:bg-secondary"
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          <form
+            className="flex gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onSubmitText();
+            }}
+          >
+            <Input
+              value={quickText}
+              onChange={(event) => onQuickTextChange(event.target.value)}
+              placeholder="Ex.: lua de mel de 5 dias em Paris, orçamento alto, focada em gastronomia"
+              className="rounded-xl"
+              disabled={loading}
+            />
+            <Button type="submit" className="rounded-xl" disabled={!quickText.trim() || loading}>
+              {loading ? <Loader2 className="size-4 animate-spin" /> : "Usar"}
+            </Button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
