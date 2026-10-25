@@ -130,9 +130,15 @@ function stripLocalMarkers(text: string): string {
 const NON_BOOKABLE_PLACE =
   /^(pousada|hotel|resort|hostel|flat|apart|casa|villa|vila|restaurante|bar|caf[eé]|bistr[oô]|aeroporto|rodovi[aá]ria|estac|praia|centro|bairro)\b/i;
 
+// Palavras que, em qualquer posição do nome, indicam hospedagem, compras ou
+// área comercial (ex.: "Universal's Endless Summer Resort", "Disney Springs",
+// "Orlando Vineland Premium Outlets", "The Florida Mall").
+const NON_BOOKABLE_ANYWHERE =
+  /\b(resort|inn|suites?|hotel|pousada|hostel|lodge|outlets?|mall|shopping|citywalk|springs|downtown|boardwalk)\b/i;
+
 function isBookableActivity(place: string, lodgingText: string): boolean {
   const label = (place.split(",")[0] ?? place).trim();
-  if (!label || NON_BOOKABLE_PLACE.test(label)) return false;
+  if (!label || NON_BOOKABLE_PLACE.test(label) || NON_BOOKABLE_ANYWHERE.test(label)) return false;
   // Nome que aparece na seção de hospedagem sugerida = hotel/pousada.
   if (lodgingText.toLowerCase().includes(label.toLowerCase())) return false;
   return true;
