@@ -31,6 +31,36 @@ export type Itinerary = {
   dicas: string;
 };
 
+// Viagem "Apenas Passeios": a pessoa NÃO quer voos nem hospedagem pela Luna.
+// O prompt já pede pra IA omitir essas partes, mas ela às vezes ignora —
+// então esta função remove de forma determinística a seção "Hospedagem
+// Sugerida" e os grupos "### Voos"/"### Hospedagem" dos links de reserva.
+export function stripForToursOnly(content: string): string {
+  const lines = content.split("\n");
+  const out: string[] = [];
+  let skipping: "section" | "group" | null = null;
+  for (const line of lines) {
+    const isH2 = /^##\s+/.test(line) && !/^###/.test(line);
+    const isH3 = /^###\s+/.test(line);
+    if (isH2) {
+      skipping = normalize(line.replace(/^##\s+/, "")).includes("hospedagem sugerida")
+        ? "section"
+        : null;
+      if (skipping) continue;
+    } else if (isH3) {
+      const title = normalize(line.replace(/^###\s+/, ""));
+      if (title === "voos" || title === "hospedagem") {
+        skipping = "group";
+        continue;
+      }
+      if (skipping === "group") skipping = null;
+    }
+    if (skipping) continue;
+    out.push(line);
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n");
+}
+
 export function isItineraryMessage(content: string): boolean {
   // Antes exigíamos que a mensagem começasse EXATAMENTE com o marcador. Só
   // que a Luna às vezes abre a resposta final com uma frase de transição
