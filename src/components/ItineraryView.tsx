@@ -128,7 +128,7 @@ function stripLocalMarkers(text: string): string {
 // atrações. Hospedagem, restaurantes, praias, aeroportos etc. não são
 // reserváveis por lá.
 const NON_BOOKABLE_PLACE =
-  /^(pousada|hotel|resort|hostel|flat|apart|casa|villa|vila|restaurante|bar|caf[eé]|bistr[oô]|aeroporto|rodovi[aá]ria|estac|praia|centro|bairro)\b/i;
+  /^(pousada|hotel|resort|hostel|flat|apart|casa|villa|vila|restaurante|bar|caf[eé]|bistr[oô]|aeroporto|rodovi[aá]ria|estac|praia|centro|bairro|pra[cç]a|largo|miradouro|rua|avenida|rio|baixa|alfama)\b/i;
 
 // Palavras que, em qualquer posição do nome, indicam hospedagem, compras ou
 // área comercial (ex.: "Universal's Endless Summer Resort", "Disney Springs",
