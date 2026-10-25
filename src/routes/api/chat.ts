@@ -5,6 +5,7 @@ import {
   isItineraryMessage,
   ITINERARY_MARKER,
   hasRequiredItinerarySections,
+  stripForToursOnly,
 } from "@/lib/itinerary";
 import { resolvePlacePhotos, resolvePlaceLocations } from "@/lib/places.server";
 import type { Database } from "@/integrations/supabase/types";
@@ -318,6 +319,8 @@ Responda somente com o roteiro reformatado.`;
         }
 
         if (isItineraryMessage(full)) {
+          const serviceType = (trip.profile as { service_type?: unknown } | null)?.service_type;
+          if (serviceType === "Apenas Passeios") full = stripForToursOnly(full);
           full = await resolvePlacePhotos(full);
           await resolvePlaceLocations(full);
         }
