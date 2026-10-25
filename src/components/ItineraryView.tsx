@@ -115,6 +115,29 @@ function ChecklistBlock({ items }: { items: string[] }) {
 // na IA pra gerar um link por atividade (risco de link inventado/quebrado):
 // o link é montado aqui no código, com um parâmetro de busca por texto que
 // já foi validado manualmente no GetYourGuide.
+// Remove marcadores {{LOCAL: ...}} que sobraram no texto (ex.: quando nenhuma
+// foto foi resolvida pro lugar). Só afeta a exibição: a extração de fotos e
+// do mapa continua usando o conteúdo bruto.
+function stripLocalMarkers(text: string): string {
+  return text
+    .replace(/\s*\{\{\s*LOCAL\s*:[^}]*\}\}/gi, "")
+    .replace(/[ \t]+$/gm, "");
+}
+
+// Só faz sentido oferecer "Reservar" (busca no GetYourGuide) pra passeios e
+// atrações. Hospedagem, restaurantes, praias, aeroportos etc. não são
+// reserváveis por lá.
+const NON_BOOKABLE_PLACE =
+  /^(pousada|hotel|resort|hostel|flat|apart|casa|villa|vila|restaurante|bar|caf[eé]|bistr[oô]|aeroporto|rodovi[aá]ria|estac|praia|centro|bairro)\b/i;
+
+function isBookableActivity(place: string, lodgingText: string): boolean {
+  const label = (place.split(",")[0] ?? place).trim();
+  if (!label || NON_BOOKABLE_PLACE.test(label)) return false;
+  // Nome que aparece na seção de hospedagem sugerida = hotel/pousada.
+  if (lodgingText.toLowerCase().includes(label.toLowerCase())) return false;
+  return true;
+}
+
 function activityBookingUrl(place: string): string {
   return `https://www.getyourguide.com/s/?q=${encodeURIComponent(place)}`;
 }
@@ -164,6 +187,7 @@ function DayByDaySection({
 }) {
   const [editMode, setEditMode] = useState(false);
   const [days, setDays] = useState<ItineraryDay[]>(itinerary.dias);
+  const lodgingText = stripLocalMarkers(itinerary.hospedagem);
 
   useEffect(() => {
     setDays(itinerary.dias);
@@ -245,7 +269,10 @@ function DayByDaySection({
                     <Icon className="mt-0.5 size-4 shrink-0 text-primary" />
                     <div className="flex-1">
                       <span className="text-sm">{activity.text}</span>
-                      {activity.kind === "passeio" && place && !editMode && (
+                      {activity.kind === "passeio" &&
+                        place &&
+                        !editMode &&
+                        isBookableActivity(place, lodgingText) && (
                         <a
                           href={activityBookingUrl(place)}
                           target="_blank"
@@ -366,7 +393,7 @@ export function ItineraryView({
             <BedDouble className="size-4 text-primary" /> Hospedagem sugerida
           </h3>
           <div className="mt-4">
-            <Markdown content={itinerary.hospedagem} />
+            <Markdown content={stripLocalMarkers(itinerary.hospedagem)} />
           </div>
         </section>
       )}
@@ -379,7 +406,7 @@ export function ItineraryView({
             <UtensilsCrossed className="size-4 text-primary" /> Restaurantes
           </h3>
           <div className="mt-4">
-            <Markdown content={itinerary.restaurantes} />
+            <Markdown content={stripLocalMarkers(itinerary.restaurantes)} />
           </div>
         </section>
       )}
