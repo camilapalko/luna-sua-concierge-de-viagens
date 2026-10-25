@@ -95,16 +95,24 @@ Descricao: "${text}"`;
           }),
         },
       );
-      if (!res.ok) return {};
+      if (!res.ok) {
+        const bodyText = await res.text().catch(() => "");
+        console.error(`parseQuickStart: Gemini respondeu HTTP ${res.status}: ${bodyText.slice(0, 300)}`);
+        return {};
+      }
       const json = (await res.json()) as {
         choices?: Array<{ message?: { content?: string } }>;
       };
       const content = json.choices?.[0]?.message?.content ?? "";
       const match = /\{[\s\S]*\}/.exec(content);
-      if (!match) return {};
+      if (!match) {
+        console.error(`parseQuickStart: resposta sem JSON: ${content.slice(0, 200)}`);
+        return {};
+      }
       const parsed = JSON.parse(match[0]) as unknown;
       return sanitize(parsed);
-    } catch {
+    } catch (error) {
+      console.error("parseQuickStart: erro inesperado", error);
       return {};
     }
   });
