@@ -16,6 +16,7 @@ import { extractLinks } from "@/lib/itinerary";
 
 function mdToPlain(text: string): string {
   return text
+    .replace(/\s*\{\{\s*LOCAL\s*:[^}]*\}\}/gi, "")
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, "$1 ($2)")
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\*\*(.*?)\*\*/g, "$1")
