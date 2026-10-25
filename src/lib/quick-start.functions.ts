@@ -90,7 +90,7 @@ Descricao: "${text}"`;
             model: MODEL,
             messages: [{ role: "user", content: prompt }],
             stream: false,
-            max_tokens: 400,
+            max_tokens: 2048,
             reasoning_effort: "low",
           }),
         },
