@@ -52,6 +52,21 @@ function sanitize(raw: unknown): QuickStartAnswers {
   return result;
 }
 
+// Tenta de novo (com espera crescente) quando o Gemini responde 429/5xx --
+// mesma ideia do chat principal. Sem isso, um pico de demanda momentaneo
+// fazia o texto livre "nao entender nada" mesmo com uma descricao clara.
+async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+  const delaysMs = [800, 1800, 3500];
+  let res = await fetch(url, init);
+  for (const delay of delaysMs) {
+    if (res.status !== 429 && res.status < 500) break;
+    console.error(`parseQuickStart: HTTP ${res.status}, tentando de novo em ${delay}ms`);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    res = await fetch(url, init);
+  }
+  return res;
+}
+
 // Interpreta uma descricao livre de viagem e devolve so os campos que a IA
 // conseguiu identificar com confianca -- nunca lanca erro pro chamador (uma
 // falha aqui e so "nao preencheu nada", nunca deve travar o intake normal).
@@ -81,7 +96,7 @@ Omita qualquer campo que nao conseguir inferir com confianca da descricao. Nunca
 Descricao: "${text}"`;
 
     try {
-      const res = await fetch(
+      const res = await fetchWithRetry(
         "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
         {
           method: "POST",
