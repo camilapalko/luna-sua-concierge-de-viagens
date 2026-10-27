@@ -81,6 +81,10 @@ async function fetchFromGoogle(query: string, apiKey: string): Promise<PlaceLook
   };
 }
 
+export async function resolvePlacePhotoUrl(rawQuery: string): Promise<string> {
+  return resolveOne(rawQuery);
+}
+
 async function resolveOne(rawQuery: string): Promise<string> {
   const query = rawQuery.trim();
   const cacheKey = normalizeQuery(query);
