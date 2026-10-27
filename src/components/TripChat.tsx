@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Markdown } from "@/components/Markdown";
 import { ItineraryView } from "@/components/ItineraryView";
 import { LunaLogo } from "@/components/LunaLogo";
+import { SwipeDiscover } from "@/components/SwipeDiscover";
 import { isItineraryMessage, parseItinerary } from "@/lib/itinerary";
 import { supabase } from "@/integrations/supabase/client";
 import { updateTripStatus, type MessageRow, type TripRow } from "@/lib/trips.functions";
@@ -38,6 +39,7 @@ export function TripChat({
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [showSlowHint, setShowSlowHint] = useState(false);
+  const [swipeOpen, setSwipeOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const started = useRef(false);
@@ -204,6 +206,31 @@ export function TripChat({
       </div>
 
       <div className="border-t border-border/70 bg-background/80 px-4 pb-4 pt-4 sm:px-6">
+        {swipeOpen && (
+          <div className="mb-3">
+            <SwipeDiscover
+              destination={trip.destination}
+              interests={Array.isArray(trip.profile?.["interests"]) ? (trip.profile["interests"] as string[]) : []}
+              days={typeof trip.profile?.["trip_duration"] === "string" ? (trip.profile["trip_duration"] as string) : ""}
+              onCancel={() => setSwipeOpen(false)}
+              onDone={(liked) => {
+                setSwipeOpen(false);
+                void send(
+                  `Escolhi estas atrações deslizando e quero que o roteiro priorize todas elas: ${liked.join("; ")}.`,
+                );
+              }}
+            />
+          </div>
+        )}
+        {!swipeOpen && !busy && !messages.some((m) => m.role === "assistant" && isItineraryMessage(m.content)) && (
+          <button
+            type="button"
+            className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10"
+            onClick={() => setSwipeOpen(true)}
+          >
+            <Sparkles className="size-3.5" /> Escolher atrações deslizando (opcional)
+          </button>
+        )}
         <form
           className="flex items-end gap-2"
           onSubmit={(event) => {
