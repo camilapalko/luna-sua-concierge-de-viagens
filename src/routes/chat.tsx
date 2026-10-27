@@ -210,6 +210,13 @@ function ChatPage() {
     async (finalAnswers: Answers) => {
       if (submitted.current) return;
       submitted.current = true;
+      // Viagem so de passeios: descarta respostas de voo/hospedagem que possam
+      // ter vindo do perfil salvo, pra nao irem pro resumo nem pro perfil da viagem.
+      if (finalAnswers["service_type"] !== "Viagem Completa") {
+        const cleaned: Answers = { ...finalAnswers };
+        for (const k of ["flight_time_pref", "airline_pref", "airline_name", "usar_milhas", "connections_pref", "accommodation_type"]) delete cleaned[k];
+        finalAnswers = cleaned;
+      }
 
       if (!session) {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(finalAnswers));
