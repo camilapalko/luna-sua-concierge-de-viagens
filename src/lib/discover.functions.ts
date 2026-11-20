@@ -63,18 +63,34 @@ export const discoverAttractions = createServerFn({ method: "POST" })
             !!x && typeof x === "object" && typeof (x as { name?: unknown }).name === "string",
         )
         .slice(0, 16);
-      const { resolvePlacePhotoUrl } = await import("@/lib/places.server");
-      const attractions = await Promise.all(
-        items.map(async (it) => ({
-          name: it.name.slice(0, 120),
-          category: typeof it.category === "string" ? it.category.slice(0, 30) : "",
-          blurb: typeof it.blurb === "string" ? it.blurb.slice(0, 160) : "",
-          photo: await resolvePlacePhotoUrl(it.name),
-        })),
-      );
+      const attractions = items.map((it) => ({
+        name: it.name.slice(0, 120),
+        category: typeof it.category === "string" ? it.category.slice(0, 30) : "",
+        blurb: typeof it.blurb === "string" ? it.blurb.slice(0, 160) : "",
+        photo: "",
+      }));
       return { attractions };
     } catch (error) {
       console.error("discoverAttractions: erro", error);
       return { attractions: [] };
+    }
+  });
+
+
+// Resolve as fotos em segundo plano (depois que os cards já apareceram).
+export const attractionPhotos = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { names: string[] }) => input)
+  .handler(async ({ data }): Promise<{ photos: string[] }> => {
+    const names = (data.names ?? []).slice(0, 16).map((n) => String(n).slice(0, 120));
+    try {
+      const { resolvePlacePhotoUrl } = await import("@/lib/places.server");
+      const photos = await Promise.all(
+        names.map((n) => resolvePlacePhotoUrl(n).catch(() => "")),
+      );
+      return { photos };
+    } catch (error) {
+      console.error("attractionPhotos: erro", error);
+      return { photos: names.map(() => "") };
     }
   });
