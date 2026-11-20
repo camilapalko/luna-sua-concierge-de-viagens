@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "place_photos_bucket_public_read" ON storage.objects;
