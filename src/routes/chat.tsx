@@ -21,6 +21,7 @@ import {
 import { createTrip } from "@/lib/trips.functions";
 import { getMyProfile } from "@/lib/profile.functions";
 import { parseQuickStart } from "@/lib/quick-start.functions";
+import { suggestRoutes } from "@/lib/routes.functions";
 import { useSession } from "@/hooks/useSession";
 
 // Atalhos pra quem ja sabe o que quer e nao quer responder pergunta por
@@ -133,6 +134,8 @@ function ChatPage() {
     staleTime: 60_000,
   });
 
+  const suggestRoutesFn = useServerFn(suggestRoutes);
+  const [routeOptions, setRouteOptions] = useState<string[] | null>(null);
   const question = INTAKE_QUESTIONS[index];
   const total = visibleQuestions(answers).length;
   const answeredCount = Object.keys(answers).length;
@@ -140,6 +143,34 @@ function ChatPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [index]);
+
+  // Passo "Rota": quando a pessoa pediu pra Luna montar a rota, busca 3 ideias
+  // de rota na hora. Se o destino ja e uma cidade unica (ou a busca falha),
+  // responde sozinho com o proprio destino e segue o questionario.
+  useEffect(() => {
+    if (question?.id !== "route_choice") return;
+    let alive = true;
+    setRouteOptions(null);
+    const destination = String(answers["destination"] ?? "");
+    const rawInterests = answers["interests"];
+    suggestRoutesFn({
+      data: {
+        destination,
+        duration: String(answers["trip_duration"] ?? ""),
+        interests: Array.isArray(rawInterests) ? rawInterests : [],
+      },
+    })
+      .then((r) => {
+        if (!alive) return;
+        if (r.routes.length === 0) answer(destination);
+        else setRouteOptions(r.routes);
+      })
+      .catch(() => alive && answer(destination));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [question?.id]);
 
   // Pré-preenche com as preferências salvas em "Meu perfil" (companhia
   // aérea, restrições alimentares, hospedagem, ritmo) numa viagem nova —
@@ -407,8 +438,11 @@ function ChatPage() {
 
               {question.type === "text" && (
                 <div className="space-y-3">
+                  {question.id === "route_choice" && routeOptions === null && (
+                    <p className="text-sm text-muted-foreground">Pensando em rotas pra você…</p>
+                  )}
                   <ChipRow
-                    options={question.suggestions ?? []}
+                    options={question.id === "route_choice" ? (routeOptions ?? []) : (question.suggestions ?? [])}
                     onPick={(value) => answer(value)}
                     subtle
                   />
