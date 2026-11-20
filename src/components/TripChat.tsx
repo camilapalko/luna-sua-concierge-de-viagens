@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Markdown } from "@/components/Markdown";
 import { ItineraryView } from "@/components/ItineraryView";
 import { LunaLogo } from "@/components/LunaLogo";
-import { SwipeDiscover } from "@/components/SwipeDiscover";
+import { SwipeFlow } from "@/components/SwipeFlow";
 import { isItineraryMessage, parseItinerary } from "@/lib/itinerary";
 import { supabase } from "@/integrations/supabase/client";
 import { upgradeTripToComplete } from "@/lib/trip-upsell.functions";
@@ -27,6 +27,23 @@ type ChatMessage = Pick<MessageRow, "role" | "content"> & {
 // limite de tokens do modelo) ou a API está mais lenta que o normal.
 const SLOW_RESPONSE_HINT_MS = 8000;
 
+// Cidades da viagem para o deslizar: a rota escolhida no questionario, ou os
+// lugares que a pessoa digitou. Sem nenhuma dessas, devolve null (destino
+// amplo demais: a Luna ainda precisa definir a rota na conversa).
+function tripCities(profile: TripRow["profile"] | null | undefined): string[] | null {
+  const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const route = str(profile?.["route_choice"]);
+  const specifics = str(profile?.["destination_specifics"]);
+  const ignored = ["Pode montar a rota pra mim", "Já sei quais lugares quero visitar"];
+  const raw = route || (ignored.includes(specifics) ? "" : specifics);
+  const list = raw
+    .split(/\s*(?:\+|,|;|\be\b|\/)\s*/i)
+    .map((c) => c.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+  return list.length > 0 ? list : null;
+}
+
 export function TripChat({
   trip,
   initialMessages,
@@ -41,6 +58,16 @@ export function TripChat({
   const [busy, setBusy] = useState(false);
   const [showSlowHint, setShowSlowHint] = useState(false);
   const [swipeOpen, setSwipeOpen] = useState(false);
+  const cities = useMemo(() => tripCities(trip.profile), [trip.profile]);
+  // Viagem nova so de passeios com rota definida: abre o deslizar ANTES da
+  // primeira resposta da Luna (a pessoa pode pular).
+  const [gate, setGate] = useState(
+    () =>
+      !!tripCities(trip.profile) &&
+      trip.profile?.["service_type"] === "Apenas Passeios" &&
+      initialMessages.length === 1 &&
+      initialMessages[0]?.role === "user",
+  );
   const [upsellHandled, setUpsellHandled] = useState(false);
   const upgrade = useServerFn(upgradeTripToComplete);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -192,6 +219,22 @@ export function TripChat({
     [upgrade, trip.id, send],
   );
 
+  const finishSwipe = useCallback(
+    (liked: string[]) => {
+      setSwipeOpen(false);
+      const msg = `Escolhi estas atrações deslizando e quero que o roteiro priorize todas elas: ${liked.join("; ")}.`;
+      if (gate) {
+        started.current = true;
+        setGate(false);
+        if (liked.length > 0) void send(msg);
+        else void send();
+      } else if (liked.length > 0) {
+        void send(msg);
+      }
+    },
+    [gate, send],
+  );
+
   const retry = useCallback(
     (message: string) => {
       void send(message, { skipPush: true });
@@ -201,12 +244,13 @@ export function TripChat({
 
   useEffect(() => {
     if (started.current) return;
+    if (gate) return;
     const last = initialMessages[initialMessages.length - 1];
     if (last && last.role === "user") {
       started.current = true;
       void send();
     }
-  }, [initialMessages, send]);
+  }, [initialMessages, send, gate]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -278,23 +322,18 @@ export function TripChat({
             </div>
           </div>
         )}
-        {swipeOpen && (
+        {(swipeOpen || gate) && (
           <div className="mb-3">
-            <SwipeDiscover
-              destination={trip.destination}
+            <SwipeFlow
+              cities={cities ?? [trip.destination]}
               interests={Array.isArray(trip.profile?.["interests"]) ? (trip.profile["interests"] as string[]) : []}
               days={typeof trip.profile?.["trip_duration"] === "string" ? (trip.profile["trip_duration"] as string) : ""}
-              onCancel={() => setSwipeOpen(false)}
-              onDone={(liked) => {
-                setSwipeOpen(false);
-                void send(
-                  `Escolhi estas atrações deslizando e quero que o roteiro priorize todas elas: ${liked.join("; ")}.`,
-                );
-              }}
+              onCancel={() => finishSwipe([])}
+              onDone={finishSwipe}
             />
           </div>
         )}
-        {!swipeOpen && !busy && !messages.some((m) => m.role === "assistant" && isItineraryMessage(m.content)) && (
+        {!swipeOpen && !gate && !busy && !messages.some((m) => m.role === "assistant" && isItineraryMessage(m.content)) && (
           <button
             type="button"
             className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10"
