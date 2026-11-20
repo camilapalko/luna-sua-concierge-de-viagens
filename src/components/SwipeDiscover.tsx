@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Heart, X, Undo2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { discoverAttractions, type Attraction } from "@/lib/discover.functions";
+import { discoverAttractions, attractionPhotos, type Attraction } from "@/lib/discover.functions";
 
 export function SwipeDiscover({
   destination,
@@ -22,6 +22,7 @@ export function SwipeDiscover({
   nextLabel?: string;
 }) {
   const load = useServerFn(discoverAttractions);
+  const loadPhotos = useServerFn(attractionPhotos);
   const [items, setItems] = useState<Attraction[] | null>(null);
   const [index, setIndex] = useState(0);
   const [liked, setLiked] = useState<string[]>([]);
@@ -32,7 +33,30 @@ export function SwipeDiscover({
   useEffect(() => {
     let alive = true;
     load({ data: { destination, ...(interests ? { interests } : {}), ...(days ? { days } : {}) } })
-      .then((r) => alive && setItems(r.attractions))
+      .then((r) => {
+        if (!alive) return;
+        setItems(r.attractions);
+        // fotos em segundo plano: primeiro as 4 primeiras, depois o resto
+        const fill = (from: number, to: number) => {
+          const names = r.attractions.slice(from, to).map((a) => a.name);
+          if (names.length === 0) return Promise.resolve();
+          return loadPhotos({ data: { names } })
+            .then((p) => {
+              if (!alive) return;
+              p.photos.forEach((u) => {
+                if (u) {
+                  const im = new Image();
+                  im.src = u;
+                }
+              });
+              setItems((cur) =>
+                cur ? cur.map((a, i) => (i >= from && i < to && p.photos[i - from] ? { ...a, photo: p.photos[i - from]! } : a)) : cur,
+              );
+            })
+            .catch(() => undefined);
+        };
+        void fill(0, 4).then(() => fill(4, 16));
+      })
       .catch(() => alive && setItems([]));
     return () => {
       alive = false;
@@ -108,12 +132,16 @@ export function SwipeDiscover({
               else setDx(0);
             }}
           >
-            <img
-              src={current.photo}
-              alt={current.name}
-              draggable={false}
-              className="size-full object-cover"
-            />
+            {current.photo ? (
+              <img
+                src={current.photo}
+                alt={current.name}
+                draggable={false}
+                className="size-full object-cover"
+              />
+            ) : (
+              <div className="size-full animate-pulse bg-gradient-to-br from-muted to-accent" />
+            )}
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4 text-white">
               {current.category && (
                 <span className="mb-1 inline-block rounded-full bg-white/20 px-2 py-0.5 text-[11px]">
