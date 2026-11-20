@@ -10,12 +10,16 @@ export function SwipeDiscover({
   days,
   onDone,
   onCancel,
+  step,
+  nextLabel,
 }: {
   destination: string;
   interests?: string[];
   days?: string;
   onDone: (liked: string[]) => void;
   onCancel: () => void;
+  step?: string;
+  nextLabel?: string;
 }) {
   const load = useServerFn(discoverAttractions);
   const [items, setItems] = useState<Attraction[] | null>(null);
@@ -57,7 +61,10 @@ export function SwipeDiscover({
   return (
     <div className="mx-auto w-full max-w-sm rounded-3xl border border-border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm font-semibold">Descubra atrações em {destination}</p>
+        <div>
+          <p className="text-sm font-semibold">Descubra atrações em {destination}</p>
+          {step && <p className="text-xs text-muted-foreground">{step}</p>}
+        </div>
         <button type="button" className="text-xs text-muted-foreground underline" onClick={onCancel}>
           Pular
         </button>
@@ -169,7 +176,7 @@ export function SwipeDiscover({
               className="mt-1 w-full rounded-xl text-sm"
               onClick={() => onDone(liked)}
             >
-              Concluir com {liked.length} escolhida(s)
+              {nextLabel ? `${nextLabel} (${liked.length})` : `Concluir com ${liked.length} escolhida(s)`}
             </Button>
           )}
         </>
@@ -181,7 +188,7 @@ export function SwipeDiscover({
             Você escolheu <strong>{liked.length}</strong> atrações!
           </p>
           <Button className="rounded-xl" onClick={() => onDone(liked)}>
-            Montar meu roteiro
+            {nextLabel ?? "Montar meu roteiro"}
           </Button>
         </div>
       )}
