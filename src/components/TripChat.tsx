@@ -11,6 +11,7 @@ import { LunaLogo } from "@/components/LunaLogo";
 import { SwipeDiscover } from "@/components/SwipeDiscover";
 import { isItineraryMessage, parseItinerary } from "@/lib/itinerary";
 import { supabase } from "@/integrations/supabase/client";
+import { upgradeTripToComplete } from "@/lib/trip-upsell.functions";
 import { updateTripStatus, type MessageRow, type TripRow } from "@/lib/trips.functions";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +41,8 @@ export function TripChat({
   const [busy, setBusy] = useState(false);
   const [showSlowHint, setShowSlowHint] = useState(false);
   const [swipeOpen, setSwipeOpen] = useState(false);
+  const [upsellHandled, setUpsellHandled] = useState(false);
+  const upgrade = useServerFn(upgradeTripToComplete);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const started = useRef(false);
@@ -153,6 +156,42 @@ export function TripChat({
     [trip.id, markFinished, queryClient],
   );
 
+  const hasItinerary = firstItineraryIndex >= 0;
+  const showUpsell =
+    hasItinerary &&
+    !upsellHandled &&
+    !busy &&
+    trip.profile?.["service_type"] === "Apenas Passeios";
+
+  const handleUpsell = useCallback(
+    async (kind: "hospedagem" | "voos" | "ambos") => {
+      setUpsellHandled(true);
+      try {
+        await upgrade({ data: { tripId: trip.id } });
+      } catch (error) {
+        setUpsellHandled(false);
+        toast.error(error instanceof Error ? error.message : "Não consegui atualizar a viagem.");
+        return;
+      }
+      const what =
+        kind === "hospedagem"
+          ? "sugestões de hospedagem"
+          : kind === "voos"
+            ? "opções de voo"
+            : "sugestões de hospedagem e opções de voo";
+      const ask =
+        kind === "hospedagem"
+          ? "tipo de hospedagem"
+          : kind === "voos"
+            ? "cidade de origem e horário preferido"
+            : "tipo de hospedagem, cidade de origem e horário de voo preferido";
+      void send(
+        `Quero também ${what} para esses passeios. Pergunte só as preferências que ainda faltam (${ask}) e depois atualize o roteiro completo incluindo essas seções e os links de reserva.`,
+      );
+    },
+    [upgrade, trip.id, send],
+  );
+
   const retry = useCallback(
     (message: string) => {
       void send(message, { skipPush: true });
@@ -206,6 +245,39 @@ export function TripChat({
       </div>
 
       <div className="border-t border-border/70 bg-background/80 px-4 pb-4 pt-4 sm:px-6">
+        {showUpsell && (
+          <div className="mb-3 rounded-2xl border border-primary/20 bg-primary/5 p-3">
+            <p className="text-sm font-medium">Quer que eu complete sua viagem?</p>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Posso sugerir onde ficar e opções de voo para esses passeios.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["hospedagem", "Sugerir hospedagem"],
+                  ["voos", "Ver opções de voo"],
+                  ["ambos", "Os dois"],
+                ] as const
+              ).map(([kind, label]) => (
+                <button
+                  key={kind}
+                  type="button"
+                  className="rounded-full border border-primary/30 bg-background px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10"
+                  onClick={() => void handleUpsell(kind)}
+                >
+                  {label}
+                </button>
+              ))}
+              <button
+                type="button"
+                className="rounded-full px-3 py-1.5 text-xs text-muted-foreground underline"
+                onClick={() => setUpsellHandled(true)}
+              >
+                Agora não
+              </button>
+            </div>
+          </div>
+        )}
         {swipeOpen && (
           <div className="mb-3">
             <SwipeDiscover
