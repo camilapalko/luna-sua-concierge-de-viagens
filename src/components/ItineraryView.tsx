@@ -134,7 +134,7 @@ const NON_BOOKABLE_PLACE =
 // área comercial (ex.: "Universal's Endless Summer Resort", "Disney Springs",
 // "Orlando Vineland Premium Outlets", "The Florida Mall").
 const NON_BOOKABLE_ANYWHERE =
-  /\b(resort|inn|suites?|hotel|pousada|hostel|lodge|outlets?|mall|shopping|citywalk|springs|downtown|boardwalk)\b/i;
+  /\b(resort|inn|suites?|hotel|pousada|hostel|lodge|outlets?|mall|shopping|citywalk|springs|downtown|boardwalk|livraria|factory|conserveira|loja|lojas|mercado|feira|bazar|boutique|padaria|confeitaria|pastelaria|cervejaria|tasca|taberna|adega|cantina|pizzaria|churrascaria|sorveteria|cafeteria|restaurante)\b/i;
 
 function isBookableActivity(place: string, lodgingText: string): boolean {
   const label = (place.split(",")[0] ?? place).trim();
