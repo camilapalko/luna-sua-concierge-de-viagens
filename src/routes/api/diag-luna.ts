@@ -13,62 +13,40 @@ export const Route = createFileRoute("/api/diag-luna")({
         const scrub = (s: string) => (gkey ? s.split(gkey).join("***") : s).slice(0, 700);
         out["hasGoogleKey"] = !!gkey;
         try {
-          const r = await fetch("https://places.googleapis.com/v1/places:searchText", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Goog-Api-Key": gkey ?? "",
-              "X-Goog-FieldMask": "places.id,places.location,places.photos",
-            },
-            body: JSON.stringify({ textQuery: "Torre de Belém, Lisboa", maxResultCount: 1 }),
-          });
-          const t = await r.text();
-          out["search"] = { status: r.status, body: scrub(t) };
-          let photoName: string | undefined;
-          try {
-            photoName = (JSON.parse(t) as { places?: Array<{ photos?: Array<{ name?: string }> }> }).places?.[0]?.photos?.[0]?.name;
-          } catch {
-            /* ignore */
+          const variants: Array<[string, string]> = [
+            ["places.id,places.displayName,places.photos", "Torre de Belém Lisboa"],
+            ["places.id,places.photos.name,places.photos.widthPx", "Eiffel Tower Paris"],
+            ["*", "Torre de Belem"],
+          ];
+          const res: unknown[] = [];
+          for (const [mask, q] of variants) {
+            const r = await fetch("https://places.googleapis.com/v1/places:searchText", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "X-Goog-Api-Key": gkey ?? "", "X-Goog-FieldMask": mask },
+              body: JSON.stringify({ textQuery: q, maxResultCount: 1 }),
+            });
+            const t = await r.text();
+            res.push({ mask, q, status: r.status, keys: (() => { try { const pl = (JSON.parse(t) as { places?: Array<Record<string, unknown>> }).places?.[0]; return pl ? Object.keys(pl) : null; } catch { return null; } })(), body: scrub(t).slice(0, 350) });
           }
-          out["photoName"] = photoName ?? null;
-          if (photoName) {
-            const p = await fetch(`https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=640&key=${gkey}`);
-            const ct = p.headers.get("content-type");
-            const buf = new Uint8Array(await p.arrayBuffer());
-            out["media"] = { status: p.status, contentType: ct, bytes: buf.length, err: p.ok ? null : scrub(new TextDecoder().decode(buf)) };
-            if (p.ok) {
-              const up = await supabaseAdmin.storage
-                .from("place-photos")
-                .upload("diag-test.jpg", buf, { contentType: ct ?? "image/jpeg", upsert: true });
-              out["upload"] = up.error ? { error: up.error.message } : "ok";
-              if (!up.error) {
-                const s = await supabaseAdmin.storage.from("place-photos").createSignedUrl("diag-test.jpg", 60);
-                out["signed"] = s.error ? { error: s.error.message } : "ok";
-                await supabaseAdmin.storage.from("place-photos").remove(["diag-test.jpg"]);
-              }
-            }
-          }
+          out["variants"] = res;
         } catch (e) {
           out["placesError"] = String(e);
         }
+        void supabaseAdmin;
         const aiKey = process.env["GEMINI_API_KEY"];
         try {
-          const r = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
+          const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent", {
             method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${aiKey}` },
+            headers: { "Content-Type": "application/json", "x-goog-api-key": aiKey ?? "" },
             body: JSON.stringify({
-              model: "gemini-3.6-flash",
-              messages: [{ role: "user", content: "A Torre de Belém em Lisboa está aberta hoje? Responda em 1 frase." }],
-              stream: false,
-              max_tokens: 1024,
-              reasoning_effort: "low",
+              contents: [{ role: "user", parts: [{ text: "A Torre de Belém em Lisboa está aberta hoje? Responda em 1 frase." }] }],
               tools: [{ google_search: {} }],
             }),
           });
           const t = await r.text();
-          out["searchTool"] = { status: r.status, body: t.slice(0, 600) };
+          out["nativeSearch"] = { status: r.status, body: t.slice(0, 900) };
         } catch (e) {
-          out["searchToolError"] = String(e);
+          out["nativeSearchError"] = String(e);
         }
         return new Response(JSON.stringify(out, null, 2), { headers: { "content-type": "application/json" } });
       },
