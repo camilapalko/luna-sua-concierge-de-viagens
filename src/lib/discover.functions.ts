@@ -31,7 +31,7 @@ export const discoverAttractions = createServerFn({ method: "POST" })
     if (!aiKey || !destination) return { attractions: [] };
     const interests = (data.interests ?? []).slice(0, 8).join(", ") || "variados";
     const days = (data.days ?? "").slice(0, 40) || "não informado";
-    const prompt = `Liste 14 atrações/experiências reais e conhecidas para visitar em "${destination}", variadas (pontos turísticos, natureza, cultura, gastronomia, vida local), priorizando os interesses: ${interests}. Duração da viagem: ${days}. Devolva SOMENTE um JSON válido (sem markdown): um array de objetos {"name": nome oficial do lugar seguido de vírgula e a cidade, "category": uma palavra ou duas (ex.: "Cultura", "Natureza", "Gastronomia"), "blurb": frase curta em português do Brasil (máx. 110 caracteres) dizendo por que vale a pena}.`;
+    const prompt = `Liste 10 atrações/experiências reais e conhecidas para visitar em "${destination}", variadas (pontos turísticos, natureza, cultura, gastronomia, vida local), priorizando os interesses: ${interests}. Duração da viagem: ${days}. Devolva SOMENTE um JSON válido (sem markdown): um array de objetos {"name": nome oficial do lugar seguido de vírgula e a cidade, "category": uma palavra ou duas (ex.: "Cultura", "Natureza", "Gastronomia"), "blurb": frase curta em português do Brasil (máx. 90 caracteres) dizendo por que vale a pena}.`;
     try {
       const res = await fetchWithRetry(
         "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
