@@ -222,7 +222,7 @@ export function TripChat({
   const finishSwipe = useCallback(
     (liked: string[]) => {
       setSwipeOpen(false);
-      const msg = `Escolhi estas atrações deslizando e quero que o roteiro priorize todas elas: ${liked.join("; ")}.`;
+      const msg = `Escolhi estas atrações deslizando e quero que o roteiro priorize todas elas: ${liked.join("; ")}. Monte AGORA o roteiro completo no formato final (cabeçalho e todas as seções), sem me fazer perguntas e sem propor a divisão dos dias para eu confirmar. Se o mês não estiver definido, assuma uma época neutra e me avise no final.`;
       if (gate) {
         started.current = true;
         setGate(false);
