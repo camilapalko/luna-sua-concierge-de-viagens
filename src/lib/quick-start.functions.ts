@@ -52,6 +52,40 @@ function sanitize(raw: unknown): QuickStartAnswers {
   return result;
 }
 
+// Plano B deterministico: pega o que da pra identificar so com regras simples
+// (duracao, companhia, tipo de servico). Serve de base quando a IA falha ou
+// omite campos, e a resposta da IA (quando valida) sobrescreve por cima.
+function heuristicParse(text: string): QuickStartAnswers {
+  const result: QuickStartAnswers = {};
+  const t = text.toLowerCase();
+  const dur = /(\d+)\s*(dias?|noites?|semanas?)/.exec(t);
+  if (dur) result["trip_duration"] = `${dur[1]} ${dur[2]}`;
+  const travelers = ALLOWED_VALUES["travelers"] ?? [];
+  const pick = (v: string) => (travelers.includes(v) ? v : undefined);
+  if (/crian[cç]|filh|fam[ií]lia/.test(t)) {
+    const v = pick("Família");
+    if (v) result["travelers"] = v;
+  } else if (/casal|lua de mel|namorad|marido|espos/.test(t)) {
+    const v = pick("Em casal");
+    if (v) result["travelers"] = v;
+  } else if (/amigos|amigas|galera/.test(t)) {
+    const v = pick("Amigos");
+    if (v) result["travelers"] = v;
+  } else if (/sozinh|solo/.test(t)) {
+    const v = pick("Sozinho(a)");
+    if (v) result["travelers"] = v;
+  }
+  const services = ALLOWED_VALUES["service_type"] ?? [];
+  if (/s[oó] (os )?passeios|apenas passeios|somente passeios|s[oó] roteiro|apenas roteiro/.test(t)) {
+    const v = services.find((x) => x === "Apenas Passeios");
+    if (v) result["service_type"] = v;
+  } else if (/voo|passagem|hospedagem|hotel|viagem completa/.test(t)) {
+    const v = services.find((x) => x === "Viagem Completa");
+    if (v) result["service_type"] = v;
+  }
+  return result;
+}
+
 // Tenta de novo (com espera crescente) quando o Gemini responde 429/5xx --
 // mesma ideia do chat principal. Sem isso, um pico de demanda momentaneo
 // fazia o texto livre "nao entender nada" mesmo com uma descricao clara.
@@ -75,7 +109,9 @@ export const parseQuickStart = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<QuickStartAnswers> => {
     const aiKey = process.env["GEMINI_API_KEY"];
     const text = data.text.trim();
-    if (!aiKey || !text) return {};
+    if (!text) return {};
+    const base = heuristicParse(text);
+    if (!aiKey) return base;
 
     // Interpola as opcoes REAIS de cada campo (as mesmas de INTAKE_QUESTIONS)
     // direto no prompt, em vez de reescreve-las a mao aqui -- assim nunca
@@ -113,7 +149,7 @@ Descricao: "${text}"`;
       if (!res.ok) {
         const bodyText = await res.text().catch(() => "");
         console.error(`parseQuickStart: Gemini respondeu HTTP ${res.status}: ${bodyText.slice(0, 300)}`);
-        return {};
+        return base;
       }
       const json = (await res.json()) as {
         choices?: Array<{ message?: { content?: string } }>;
@@ -122,12 +158,12 @@ Descricao: "${text}"`;
       const match = /\{[\s\S]*\}/.exec(content);
       if (!match) {
         console.error(`parseQuickStart: resposta sem JSON: ${content.slice(0, 200)}`);
-        return {};
+        return base;
       }
       const parsed = JSON.parse(match[0]) as unknown;
-      return sanitize(parsed);
+      return { ...base, ...sanitize(parsed) };
     } catch (error) {
       console.error("parseQuickStart: erro inesperado", error);
-      return {};
+      return base;
     }
   });
