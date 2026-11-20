@@ -8,6 +8,7 @@ import {
   stripForToursOnly,
 } from "@/lib/itinerary";
 import { resolvePlacePhotos, resolvePlaceLocations } from "@/lib/places.server";
+import { researchDestination, researchPlaces } from "@/lib/research.server";
 import type { Database } from "@/integrations/supabase/types";
 
 type Body = { tripId?: string; message?: string };
@@ -76,11 +77,29 @@ export const Route = createFileRoute("/api/chat")({
           .order("id", { ascending: true });
         if (historyError) return json({ error: historyError.message }, 500);
 
+        // Pesquisa na web uma unica vez por viagem (quando ja ha cidades
+        // definidas) e guarda no perfil; o contexto da Luna inclui o resultado.
+        let profile = (trip.profile ?? {}) as unknown as Record<string, unknown>;
+        if (profile["__research"] === undefined) {
+          const places = researchPlaces(profile);
+          if (places.length > 0) {
+            const when = String(profile["dates"] ?? profile["trip_duration"] ?? "");
+            const research = await researchDestination(aiKey, places, when);
+            profile = { ...profile, __research: research ?? "" };
+            await supabase
+              .from("trips")
+              .update({ profile: profile as never })
+              .eq("id", trip.id);
+          }
+        }
+        const contextProfile = { ...profile };
+        if (!contextProfile["__research"]) delete contextProfile["__research"];
+
         const messages = [
           { role: "system", content: LUNA_SYSTEM_PROMPT },
           {
             role: "system",
-            content: buildContextPrompt((trip.profile ?? {}) as unknown as Record<string, unknown>),
+            content: buildContextPrompt(contextProfile),
           },
           ...(history ?? []).map((m) => ({ role: m.role, content: m.content })),
         ];
