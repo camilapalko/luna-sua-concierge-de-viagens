@@ -235,6 +235,18 @@ export const INTAKE_QUESTIONS: IntakeQuestion[] = [
     options: ["Relaxado", "Moderado", "Intenso"],
   },
   {
+    id: "route_choice",
+    label: "Rota",
+    prompt: "Pensei em algumas ideias de rota pra você. Qual combina mais? (ou escreva a sua)",
+    type: "text",
+    placeholder: "Ex: Lisboa e Porto",
+    suggestions: [],
+    // So aparece quando a pessoa pediu pra Luna montar a rota. As opcoes sao
+    // geradas na hora (ver suggestRoutes); se o destino ja for uma cidade
+    // unica, a propria tela responde sozinha com o destino e segue.
+    skip: (a) => a["destination_specifics"] !== "Pode montar a rota pra mim",
+  },
+  {
     id: "dietary_restrictions",
     label: "Restrições alimentares",
     prompt: "Alguma restrição alimentar que eu deva considerar?",
